@@ -91,7 +91,8 @@ kbd{font-family:var(--body);font-weight:700;background:var(--panel);border:1px s
 .netbar{border:1px solid var(--line);background:var(--panel);padding:10px 14px;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center}
 .netbar[hidden]{display:none}
 .netbar b{color:var(--gold)}
-.nethud{position:absolute;right:10px;top:46%;flex-direction:column;align-items:flex-end;display:flex;gap:6px;opacity:.9;z-index:4;pointer-events:none}
+.nethud{position:absolute;left:50%;top:23%;transform:translateX(-50%);flex-direction:column;align-items:center;display:flex;gap:4px;z-index:4;pointer-events:none}
+.nethud span:not(.talk){display:none}
 .nethud span{font:700 12px var(--body);background:rgba(8,5,4,.78);border:1px solid var(--line);border-radius:12px;padding:2px 9px;color:var(--muted);transition:color .1s,border-color .1s}
 .nethud span.talk{color:#8fd18f;border-color:#8fd18f}
 .nethud[hidden]{display:none}
@@ -1485,6 +1486,8 @@ function anyAffordable(){if(UPG.some(u=>{const l=upg(u.id),max=u.cost==='inf'?1e
 // the host streams its canvas + game sound to the guest, the guest sends key actions back, both send voice.
 const NET={role:null,code:'',heroes:null,pc:null,dc:null,sig:null,gid:'',mic:null,micTrack:null,peerAudio:null,connected:false,lastPing:0,rtt:0};
 const qs=new URLSearchParams(location.search);
+// ask Chrome to start the video bitrate high instead of ramping up from a blurry 300 kbit/s
+const sdpFast=sdp=>sdp.replace(/(a=fmtp:\d+ [^\r\n]*)/g,(m_)=>m_.includes('x-google')||/apt=|annexb|useinbandfec/.test(m_)?m_:m_+';x-google-start-bitrate=5000;x-google-min-bitrate=2500;x-google-max-bitrate=9000').replace(/(m=video[^\r\n]*\r?\n)/,'$1b=AS:9000\r\n');
 const BROKERS=qs.get('broker')?[qs.get('broker')]:['wss://broker.emqx.io:8084/mqtt','wss://broker.hivemq.com:8884/mqtt','wss://test.mosquitto.org:8081/mqtt'];
 const NETBASE='kuhnya-liha/v1/';
 const $=id=>document.getElementById(id);
@@ -1543,7 +1546,7 @@ function heroCode(i,a){return a==='dash'||a==='skill'?AB[i][a]:P[i].ctrl[a];}
 const CODE2ACT={},SCH={wasd:{},arrows:{}};for(let i=0;i<2;i++)for(const a of ACTS){CODE2ACT[heroCode(i,a)]=a;SCH[i?'arrows':'wasd'][heroCode(i,a)]=a;}
 const SCHNAME={wasd:'WASD',arrows:'стрелки'};
 NET.scheme='wasd';try{const v=localStorage.getItem('kuhnya-ctrl');if(SCH[v])NET.scheme=v;}catch(e){}NET.peerScheme=null;
-function netActOf(code){if(code==='Space'||code==='Enter')return 'ok';if(code==='KeyP'||code==='Escape')return 'pause';return SCH[NET.scheme][code]||null;}
+function netActOf(code){if(/^Digit[1-4]$/.test(code))return 'qb'+code.slice(5);if(code==='Space'||code==='Enter')return 'ok';if(code==='KeyP'||code==='Escape')return 'pause';return SCH[NET.scheme][code]||null;}
 function netMapHost(code){if(!NET.heroes||!(S.scene==='play'||S.scene==='tutorial'))return code;const a=SCH[NET.scheme][code];if(a)return heroCode(NET.heroes.h,a);return CODE2ACT[code]?'NetOff':code;}
 function netGuestKey(e,down){if(document.activeElement&&/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName))return;
   const a=netActOf(e.code);if(!a)return;e.preventDefault();if(down&&e.repeat)return;netSend({t:'k',a,d:down?1:0});}
@@ -1553,13 +1556,14 @@ function netOnData(m){
   if(m.t==='ping'){netSend({t:'pong',ts:m.ts});return;}
   if(m.t==='scheme'){if(SCH[m.s])NET.peerScheme=m.s;return;}
   if(m.t==='pong'){NET.rtt=Math.round(performance.now()-m.ts);$('netBarPing').textContent='задержка '+NET.rtt+' мс';return;}
-  if(NET.role!=='host'||m.t!=='k'||!(ACTS.includes(m.a)||m.a==='ok'||m.a==='pause'))return;
+  if(NET.role!=='host'||m.t!=='k'||!(ACTS.includes(m.a)||m.a==='ok'||m.a==='pause'||/^qb[1-4]$/.test(m.a)))return;
   if(S.scene==='lobby'){if(m.d)lobbyAct('g',m.a);return;}
   if(!NET.heroes)return;
   if(m.a==='pause'){if(m.d&&(S.scene==='play'||S.scene==='tutorial'))togglePause();return;}
   if(m.a==='ok'){if(!m.d)return;if(S.paused){togglePause(false);return;}if(['story','nightEnd','final','prologue','over'].includes(S.scene)||S.scene==='tutorial')advance();return;}
   if(S.paused||!(S.scene==='play'||S.scene==='tutorial'))return;
-  const code=heroCode(NET.heroes.g,m.a);keys[code]=!!m.d;if(m.d)onKeyDown({code,repeat:false,preventDefault(){}});
+  if(m.a.startsWith('qb')){if(m.d&&S.scene==='play')quickBuy(+m.a.slice(2)-1);return;}
+  const code=heroCode(NET.heroes.g,m.a);if(m.d){if(!keys[code])onKeyDown({code,repeat:false,preventDefault(){}});keys[code]=true;}else keys[code]=false;
 }
 // --- connection ---
 function netPC(){const pc=new RTCPeerConnection({iceServers:iceServers()});
@@ -1572,7 +1576,7 @@ function netConnected(){$('netBar').hidden=false;$('netHud').hidden=false;$('net
   clearInterval(NET.pingT);NET.pingT=setInterval(()=>netSend({t:'ping',ts:performance.now()}),2000);setTimeout(()=>netSend({t:'scheme',s:NET.scheme}),300);
   if(NET.role==='host'){netShowPanel(false);if(S.scene!=='lobby'&&!NET.heroes)netOpenLobby();if(S.lobby)S.lobby.guest=true;
     if(NET.heroes&&S.scene!=='lobby')setBanner('Напарник снова с нами','#8fd18f');
-    for(const s_ of NET.pc.getSenders())if(s_.track&&s_.track.kind==='video'){const p=s_.getParameters();p.encodings=p.encodings&&p.encodings.length?p.encodings:[{}];p.encodings[0].maxBitrate=3000000;p.degradationPreference='maintain-resolution';p.encodings[0].maxFramerate=30;p.encodings[0].scaleResolutionDownBy=dpr;s_.setParameters(p).catch(()=>{});}}
+    for(const s_ of NET.pc.getSenders())if(s_.track&&s_.track.kind==='video'){const p=s_.getParameters();p.encodings=p.encodings&&p.encodings.length?p.encodings:[{}];p.encodings[0].maxBitrate=9000000;p.degradationPreference='maintain-resolution';p.encodings[0].maxFramerate=30;p.encodings[0].scaleResolutionDownBy=1;s_.setParameters(p).catch(()=>{});}}
   else{netShowPanel(false);$('frame').classList.add('guest');$('netVideo').focus();}}
 function netLost(msg){NET.connected=false;netStat(msg,'err');
   if(NET.role==='host'){if(S.scene==='play'&&!S.paused)togglePause(true);setBanner('Напарник отключился. Ждём — пусть снова войдёт по коду '+NET.code,C.cin);if(S.lobby)S.lobby.guest=false;
@@ -1583,7 +1587,7 @@ async function netHost(){initAudio();netVAC();if(!AC){netStat('Звук брау
   if(NET.sig)NET.sig.close();NET.role='host';NET.code=String(100000+Math.floor(Math.random()*900000));
   $('netHostBox').hidden=false;$('netCode').textContent=NET.code.slice(0,3)+' '+NET.code.slice(3);$('netCopy').hidden=!/^https?:/.test(location.protocol);
   netStat('Подключаемся к серверам связи…');await netMic();
-  if(!NET.game){const v=cv.captureStream(30).getVideoTracks()[0];try{v.contentHint='detail';}catch(e){}const dest=AC.createMediaStreamDestination();BUS.master.connect(dest);NET.game=new MediaStream([v,dest.stream.getAudioTracks()[0]]);}
+  if(!NET.game){let src=cv;if(dpr<2){const cap=document.createElement('canvas');cap.width=W*2;cap.height=H*2;const cx2=cap.getContext('2d');cx2.imageSmoothingEnabled=false;NET.capDraw=()=>{cx2.drawImage(cv,0,0,cap.width,cap.height);};src=cap;}const v=src.captureStream(30).getVideoTracks()[0];try{v.contentHint='detail';}catch(e){}const dest=AC.createMediaStreamDestination();BUS.master.connect(dest);NET.game=new MediaStream([v,dest.stream.getAudioTracks()[0]]);}
   NET.sig=new Sig(m=>netHostMsg(m));NET.sig.sub(NETBASE+NET.code+'/h');netWatchSig();
   setTimeout(()=>{if(NET.sig&&NET.sig.up>0&&!NET.connected)netStat('Комната открыта. Продиктуйте напарнику код '+NET.code.slice(0,3)+' '+NET.code.slice(3)+' — и ждите.','ok');},1500);
   S.lobby={h:0,g:0,hr:false,gr:false,guest:false};}
@@ -1592,6 +1596,7 @@ async function netHostMsg(m){
     if(NET.gid===m.gid&&NET.pc)return;
     try{NET.pc&&NET.pc.close();}catch(e){}NET.gid=m.gid;const pc=NET.pc=netPC();const to=NETBASE+NET.code+'/g/'+m.gid;
     for(const tr of NET.game.getTracks())pc.addTrack(tr,NET.game);
+    try{const caps=RTCRtpSender.getCapabilities&&RTCRtpSender.getCapabilities('video');const vt=pc.getTransceivers().find(t=>t.sender.track&&t.sender.track.kind==='video');if(caps&&vt&&vt.setCodecPreferences){const pri=c=>/H264/i.test(c.mimeType)?0:/VP9/i.test(c.mimeType)?1:/VP8/i.test(c.mimeType)?2:3;vt.setCodecPreferences(caps.codecs.slice().sort((a,b)=>pri(a)-pri(b)));}}catch(e){}
     if(NET.mic)pc.addTrack(NET.micTrack,NET.mic);else pc.addTransceiver('audio',{direction:'recvonly'});
     NET.dc=pc.createDataChannel('g');NET.dc.onmessage=ev=>{try{netOnData(JSON.parse(ev.data));}catch(e){}};
     pc.ontrack=ev=>{if(ev.track.kind==='audio')netPeerVoice(ev.streams[0]||new MediaStream([ev.track]));};
@@ -1600,7 +1605,7 @@ async function netHostMsg(m){
     NET.sig.pub(to,{t:'offer',sdp:pc.localDescription.sdp,gs:NET.game.id});netStat('Напарник стучится… соединяемся.');
     clearTimeout(NET.failT);NET.failT=setTimeout(()=>{if(!NET.connected)netStat('Соединение не устанавливается. Если так и не выйдет — нужен TURN-сервер (ниже).','err');},20000);}
   else if(m.gid===NET.gid&&NET.pc){
-    if(m.t==='answer'){await NET.pc.setRemoteDescription({type:'answer',sdp:m.sdp});for(const c of NET.pend)NET.pc.addIceCandidate(c).catch(()=>{});NET.pend=[];}
+    if(m.t==='answer'){await NET.pc.setRemoteDescription({type:'answer',sdp:sdpFast(m.sdp)});for(const c of NET.pend)NET.pc.addIceCandidate(c).catch(()=>{});NET.pend=[];}
     else if(m.t==='ice'){if(NET.pc.remoteDescription)NET.pc.addIceCandidate(m.c).catch(()=>{});else NET.pend.push(m.c);}}}
 async function netJoin(){netVAC();const code=$('netJoinCode').value.replace(/\D/g,'');if(code.length!==6){netStat('Код — это 6 цифр.','err');return;}
   if(AC)try{AC.suspend();}catch(e){}if(mus.timer){clearInterval(mus.timer);mus.timer=null;}
@@ -1616,7 +1621,7 @@ async function netGuestMsg(m,host){
     pc.ontrack=ev=>{const st=ev.streams[0];if(st&&st.id===m.gs){const v=$('netVideo');if(v.srcObject!==st){v.srcObject=st;v.play().catch(()=>{});}}else if(ev.track.kind==='audio')netPeerVoice(st||new MediaStream([ev.track]));};
     pc.ondatachannel=ev=>{NET.dc=ev.channel;NET.dc.onmessage=e2=>{try{netOnData(JSON.parse(e2.data));}catch(e){}};};
     pc.onicecandidate=ev=>{if(ev.candidate)NET.sig.pub(host,{t:'ice',gid:NET.gid,c:ev.candidate.toJSON()});};
-    await pc.setRemoteDescription({type:'offer',sdp:m.sdp});
+    await pc.setRemoteDescription({type:'offer',sdp:sdpFast(m.sdp)});
     if(NET.mic){const tr=pc.getTransceivers().filter(t=>t.receiver.track.kind==='audio')[1];if(tr){tr.direction='sendrecv';await tr.sender.replaceTrack(NET.micTrack);}}
     for(const c of NET.pend)pc.addIceCandidate(c).catch(()=>{});NET.pend=[];
     const ans=await pc.createAnswer();await pc.setLocalDescription(ans);NET.sig.pub(host,{t:'answer',gid:NET.gid,sdp:pc.localDescription.sdp});netStat('Комната найдена, соединяемся…');
@@ -2166,6 +2171,7 @@ function frame(now){
   if(!S.achPop&&S.achQ&&S.achQ.length){S.achPop={a:S.achQ.shift(),life:3.5};[784,988,1175].forEach((f,i)=>setTimeout(()=>beep(f,.18,'sine',.06),i*100));}
   if(S.achPop){S.achPop.life-=1/60;const a=S.achPop.a,k=Math.min(1,S.achPop.life*2,(3.5-S.achPop.life)*4);ctx.globalAlpha=k;rr(W/2-230,8,460,52,10,'#1f2a18');ctx.strokeStyle='#8fd18f';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(W/2-229,9,458,50,10);ctx.stroke();
     ctx.textAlign='center';ctx.fillStyle=a.fact?'#ffb347':'#8fd18f';ctx.font='bold 16px '+FB;ctx.fillText(a.fact?a.name:'Грамота: '+a.name,W/2,30);ctx.fillStyle=C.ivory;ctx.font='13px '+FB;ctx.fillText(a.fact?a.desc:a.desc+'   ·   +'+a.c+' грошей, +1 очко умений',W/2,49);ctx.globalAlpha=1;if(S.achPop.life<=0)S.achPop=null;}
+  if(NET.capDraw&&NET.connected)NET.capDraw();
   requestAnimationFrame(frame);
 }
 if(BOOT==='new')startPrologue(false);else if(BOOT==='cont'){S.scene=SAVE.tutDone?'title':'menu';}

@@ -65,7 +65,7 @@ kbd{font-family:var(--body);font-weight:700;background:var(--panel);border:1px s
 .credits{color:var(--muted);font-size:13px;border-top:1px solid var(--line);padding-top:14px}
 .credits p{margin:0 0 4px}
 
-.frame video{display:none;width:100%;height:auto;background:#000}
+.frame video{display:none;width:100%;height:auto;aspect-ratio:1064/576;background:#000}
 .frame.guest canvas{display:none}.frame.guest video{display:block}
 .frame:fullscreen video,.frame.big video{width:min(100vw,calc(100vh * 1064 / 576));height:auto}
 .netpanel{position:absolute;inset:6px;background:rgba(8,5,4,.94);display:flex;align-items:flex-start;justify-content:center;overflow:auto;z-index:5}
@@ -93,6 +93,15 @@ kbd{font-family:var(--body);font-weight:700;background:var(--panel);border:1px s
 .netbar b{color:var(--gold)}
 .nethud{position:absolute;left:50%;top:23%;transform:translateX(-50%);flex-direction:column;align-items:center;display:flex;gap:4px;z-index:4;pointer-events:none}
 .nethud span:not(.talk){display:none}
+.netre{position:absolute;inset:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:rgba(8,5,4,.72);z-index:6;text-align:center;padding:16px}
+.netre[hidden]{display:none}
+.netre b{font:400 26px var(--display);color:var(--gold)}
+.netre span{color:var(--ivory);font-size:15px;max-width:46ch}
+.keygrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px}
+.keybtn{display:flex;justify-content:space-between;align-items:center;gap:8px;font:500 14px var(--body);color:var(--ivory);background:var(--lacquer);border:1px solid var(--line);border-radius:6px;padding:6px 10px;cursor:pointer;text-align:left}
+.keybtn b{font-weight:700;color:var(--gold);min-width:2.2em;text-align:center;border:1px solid var(--line);border-bottom-width:2px;border-radius:4px;padding:0 6px}
+.keybtn:hover{border-color:var(--gold)}.keybtn:focus-visible{outline:2px solid var(--ivory);outline-offset:2px}
+.keybtn.wait{border-color:#ffb347}.keybtn.wait b{color:#ffb347}
 .nethud span{font:700 12px var(--body);background:rgba(8,5,4,.78);border:1px solid var(--line);border-radius:12px;padding:2px 9px;color:var(--muted);transition:color .1s,border-color .1s}
 .nethud span.talk{color:#8fd18f;border-color:#8fd18f}
 .nethud[hidden]{display:none}
@@ -106,13 +115,18 @@ details.turn summary{cursor:pointer;color:var(--gold);font-size:14px}
   </header>
 
   <div class="frame" id="frame"><canvas id="game" tabindex="0" aria-label="Игра Кухня Лиха"></canvas><video id="netVideo" playsinline autoplay tabindex="0" aria-label="Картинка игры хозяина комнаты"></video><button type="button" id="fsBtn" class="fsbtn">Во весь экран</button>
+  <div class="netre" id="netRe" hidden role="status" aria-live="polite"><b>Связь пропала</b><span id="netReText">Переподключаемся…</span><button type="button" class="btn ghost" id="netReStop">Отменить</button></div>
   <div class="nethud" id="netHud" hidden><span id="hudMe">🎙 Вы</span><span id="hudPeer">🎙 Напарник</span></div>
   <div class="netpanel" id="netPanel" hidden role="dialog" aria-labelledby="netTitle"><div class="netbox">
     <div class="netrow" style="justify-content:space-between"><h2 id="netTitle">Игра по сети</h2><button type="button" class="btn ghost" id="netClose">Закрыть</button></div>
     <p class="note">Каждый открывает игру у себя. Хозяин создаёт комнату и диктует код, гость вводит его. Играют на сохранении хозяина: гость видит его экран и управляет своим героем. Связь идёт напрямую между компьютерами. Лучше всего в Chrome или Яндекс Браузере; окно игры не сворачивайте.</p>
     <div class="netcard"><h3>Моё управление</h3><p>У каждого свой компьютер, так что выберите удобные клавиши. Выбранный набор управляет вашим героем, другой отключён.</p>
       <div class="netrow" role="radiogroup" aria-label="Клавиши управления"><label class="toggle" for="schW"><input type="radio" name="sch" id="schW" value="wasd"> <b>WASD</b>&nbsp;· F взять, G работать, Q рывок, E умение</label>
-      <label class="toggle" for="schA"><input type="radio" name="sch" id="schA" value="arrows"> <b>Стрелки</b>&nbsp;· K взять, L работать, J рывок, O умение</label></div></div>
+      <label class="toggle" for="schA"><input type="radio" name="sch" id="schA" value="arrows"> <b>Стрелки</b>&nbsp;· K взять, L работать, J рывок, O умение</label>
+      <label class="toggle" for="schC"><input type="radio" name="sch" id="schC" value="custom"> <b>Свои клавиши</b>&nbsp;· настройте ниже</label></div>
+      <p>Свои клавиши: нажмите на действие, потом на клавишу. Занятая клавиша поменяется местами. Пробел, Enter, Esc, P и 1–4 заняты игрой.</p>
+      <div class="keygrid" id="keyGrid"></div>
+      <div class="netrow"><button type="button" class="btn ghost" id="keyReset">Сбросить свои клавиши</button><span id="keyMsg" aria-live="polite"></span></div></div>
     <div class="netgrid">
       <div class="netcard"><h3>Создать комнату</h3><p>Для того, у кого трактир. Будет открыт слот <span id="netSlot">1</span>.</p>
         <button type="button" class="btn" id="netHost">Создать комнату</button>
@@ -1353,8 +1367,8 @@ function drawShadowMarks(){
 
 // ---------- HUD ----------
 function heroScheme(i){if(NET.role==='host'&&NET.heroes){if(i===NET.heroes.h)return NET.scheme;return NET.peerScheme||(i?'arrows':'wasd');}return i?'arrows':'wasd';}
-function heroKeys(i){return SCHNAME[heroScheme(i)];}
-function keyLine(i,sk){const cdT=v=>v>0?Math.ceil(v)+'с':'✓';const w=heroScheme(i)==='wasd',p=P[i];return (w?'WASD · F взять · G рубить · Q рывок ':'стрелки · K взять · L рубить · J рывок ')+cdT(p.dashCd)+(w?' · E ':' · O ')+sk+' '+cdT(p.skillCd);}
+function heroKeys(i){return moveLabel(bindOf(i));}
+function keyLine(i,sk){const cdT=v=>v>0?Math.ceil(v)+'с':'✓';const b=bindOf(i),p=P[i];return moveLabel(b)+' · '+keyName(b.use)+' взять · '+keyName(b.work)+' рубить · '+keyName(b.dash)+' рывок '+cdT(p.dashCd)+' · '+keyName(b.skill)+' '+sk+' '+cdT(p.skillCd);}
 function guestCard(o,x,y,cw){
   const fr=o.t===Infinity?1:o.t/o.max,shake=fr<.25?Math.sin(S.blink*40)*1.5:0;
   ctx.save();ctx.translate(shake,0);
@@ -1501,21 +1515,23 @@ function mPkt(type,body){return new Uint8Array([type,...mLen(body.length),...bod
 class Sig{
   constructor(onMsg){this.onMsg=onMsg;this.subs=[];this.socks=[];this.seen=new Set();this.up=0;
     for(const url of BROKERS)this.open(url);
-    this.ping=setInterval(()=>{for(const k of this.socks)if(k.ready)try{k.ws.send(new Uint8Array([0xC0,0]));}catch(e){}},25000);}
-  open(url){const k={ws:null,ready:false,buf:new Uint8Array(0),pid:1,url};this.socks.push(k);
-    try{k.ws=new WebSocket(url,'mqtt');}catch(e){return;}k.ws.binaryType='arraybuffer';
+    this.ping=setInterval(()=>{for(const k of this.socks)if(k.ready&&k.ws)try{k.ws.send(new Uint8Array([0xC0,0]));}catch(e){}},25000);}
+  open(url){const k={ws:null,ready:false,buf:new Uint8Array(0),pid:1,url,tries:0};this.socks.push(k);this.connect(k);}
+  connect(k){if(this.closed)return;k.buf=new Uint8Array(0);
+    try{k.ws=new WebSocket(k.url,'mqtt');}catch(e){this.retry(k);return;}k.ws.binaryType='arraybuffer';
     k.ws.onopen=()=>{k.ws.send(mPkt(0x10,[...mStr('MQTT'),4,2,0,60,...mStr('kl'+rid(10))]));};
     k.ws.onmessage=ev=>{const a=new Uint8Array(ev.data),b=new Uint8Array(k.buf.length+a.length);b.set(k.buf);b.set(a,k.buf.length);k.buf=b;this.parse(k);};
-    k.ws.onclose=k.ws.onerror=()=>{if(k.ready){k.ready=false;this.up--;}k.dead=true;};}
+    const ws=k.ws;ws.onclose=ws.onerror=()=>{if(k.ws!==ws)return;k.ws=null;if(k.ready){k.ready=false;this.up--;}this.retry(k);};}
+  retry(k){if(this.closed||k.retryT)return;k.tries++;k.retryT=setTimeout(()=>{k.retryT=null;this.connect(k);},Math.min(15000,1500*k.tries));}
   parse(k){for(;;){const b=k.buf;if(b.length<2)return;let mul=1,len=0,i=1,d;do{if(i>=b.length)return;d=b[i++];len+=(d&127)*mul;mul*=128;}while(d&128);
       if(b.length<i+len)return;const type=b[0]>>4,body=b.subarray(i,i+len);k.buf=b.slice(i+len);
-      if(type===2){k.ready=true;this.up++;for(const t of this.subs)this.subOn(k,t);}
+      if(type===2){if(!k.ready){k.ready=true;this.up++;}k.tries=0;for(const t of this.subs)this.subOn(k,t);}
       else if(type===3){const tl=(body[0]<<8)|body[1];const qos=(b[0]>>1)&3;const off=2+tl+(qos?2:0);try{this.got(JSON.parse(td.decode(body.subarray(off))));}catch(e){}}}}
   subOn(k,t){const id=k.pid++&0xffff||1;k.ws.send(mPkt(0x82,[id>>8,id&255,...mStr(t),0]));}
-  sub(t){this.subs.push(t);for(const k of this.socks)if(k.ready)this.subOn(k,t);}
-  pub(t,obj){obj.mid=rid(8);const body=[...mStr(t),...te.encode(JSON.stringify(obj))];const p=mPkt(0x30,body);let n=0;for(const k of this.socks)if(k.ready){try{k.ws.send(p);n++;}catch(e){}}return n;}
+  sub(t){if(this.subs.includes(t))return;this.subs.push(t);for(const k of this.socks)if(k.ready)this.subOn(k,t);}
+  pub(t,obj){obj.mid=rid(8);const body=[...mStr(t),...te.encode(JSON.stringify(obj))];const p=mPkt(0x30,body);let n=0;for(const k of this.socks)if(k.ready&&k.ws){try{k.ws.send(p);n++;}catch(e){}}return n;}
   got(m){if(!m||!m.mid||this.seen.has(m.mid))return;this.seen.add(m.mid);this.onMsg(m);}
-  close(){clearInterval(this.ping);for(const k of this.socks)try{k.ws.close();}catch(e){}this.socks=[];}
+  close(){this.closed=true;clearInterval(this.ping);for(const k of this.socks){clearTimeout(k.retryT);try{k.ws&&k.ws.close();}catch(e){}}this.socks=[];}
 }
 function iceServers(){const L=[{urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302']},{urls:'stun:stun.nextcloud.com:443'}];
   try{const t=JSON.parse(localStorage.getItem('kuhnya-turn')||'null');if(t&&t.url)L.push({urls:t.url,username:t.user||'',credential:t.pass||''});}catch(e){}return L;}
@@ -1544,7 +1560,17 @@ function netPeerVoice(stream){if(!NET.peerAudio){NET.peerAudio=new Audio();NET.p
 const ACTS=['up','down','left','right','use','work','dash','skill'];
 function heroCode(i,a){return a==='dash'||a==='skill'?AB[i][a]:P[i].ctrl[a];}
 const CODE2ACT={},SCH={wasd:{},arrows:{}};for(let i=0;i<2;i++)for(const a of ACTS){CODE2ACT[heroCode(i,a)]=a;SCH[i?'arrows':'wasd'][heroCode(i,a)]=a;}
-const SCHNAME={wasd:'WASD',arrows:'стрелки'};
+const SCHNAME={wasd:'WASD',arrows:'стрелки',custom:'свои клавиши'};
+const BIND={wasd:{},arrows:{}};for(let i=0;i<2;i++)for(const a of ACTS)BIND[i?'arrows':'wasd'][a]=heroCode(i,a);
+const RESERVED=/^(Space|Enter|NumpadEnter|Escape|KeyP|Digit[1-4]|Tab|MetaLeft|MetaRight|ContextMenu|F\d+|CapsLock)$/;
+const okBind=b=>b&&typeof b==='object'&&ACTS.every(a=>typeof b[a]==='string'&&/^[A-Za-z0-9]{1,24}$/.test(b[a])&&!RESERVED.test(b[a]))&&new Set(ACTS.map(a=>b[a])).size===ACTS.length;
+BIND.custom=Object.assign({},BIND.wasd);try{const v=JSON.parse(localStorage.getItem('kuhnya-keys')||'null');if(okBind(v))BIND.custom=v;}catch(e){}
+function rebuildSch(){SCH.custom={};for(const a of ACTS)SCH.custom[BIND.custom[a]]=a;}rebuildSch();
+function keyName(c){if(!c)return '?';const A={ArrowUp:'↑',ArrowDown:'↓',ArrowLeft:'←',ArrowRight:'→',ShiftLeft:'Shift',ShiftRight:'Shift П',ControlLeft:'Ctrl',ControlRight:'Ctrl П',AltLeft:'Alt',AltRight:'Alt П',Semicolon:';',Quote:"'",Comma:',',Period:'.',Slash:'/',Backslash:'\\',BracketLeft:'[',BracketRight:']',Minus:'-',Equal:'=',Backquote:'`',Backspace:'⌫',Delete:'Del'};
+  return A[c]||c.replace(/^Key/,'').replace(/^Digit/,'').replace(/^Numpad/,'Num ');}
+function bindOf(i){if(NET.role==='host'&&NET.heroes){if(i===NET.heroes.h)return BIND[NET.scheme];if(NET.peerKeys)return NET.peerKeys;if(NET.peerScheme&&BIND[NET.peerScheme]&&NET.peerScheme!=='custom')return BIND[NET.peerScheme];}return BIND[i?'arrows':'wasd'];}
+function moveLabel(b){const same=k=>ACTS.slice(0,4).every(a=>b[a]===BIND[k][a]);return same('wasd')?'WASD':same('arrows')?'стрелки':keyName(b.up)+keyName(b.left)+keyName(b.down)+keyName(b.right);}
+function myScheme(){return {s:NET.scheme,k:BIND[NET.scheme]};}
 NET.scheme='wasd';try{const v=localStorage.getItem('kuhnya-ctrl');if(SCH[v])NET.scheme=v;}catch(e){}NET.peerScheme=null;
 function netActOf(code){if(/^Digit[1-4]$/.test(code))return 'qb'+code.slice(5);if(code==='Space'||code==='Enter')return 'ok';if(code==='KeyP'||code==='Escape')return 'pause';return SCH[NET.scheme][code]||null;}
 function netMapHost(code){if(!NET.heroes||!(S.scene==='play'||S.scene==='tutorial'))return code;const a=SCH[NET.scheme][code];if(a)return heroCode(NET.heroes.h,a);return CODE2ACT[code]?'NetOff':code;}
@@ -1553,8 +1579,9 @@ function netGuestKey(e,down){if(document.activeElement&&/^(INPUT|SELECT|TEXTAREA
 function netGuestBlur(){for(const a of ACTS)netSend({t:'k',a,d:0});}
 function netSend(m){if(NET.dc&&NET.dc.readyState==='open')try{NET.dc.send(JSON.stringify(m));}catch(e){}}
 function netOnData(m){
+  NET.lastRx=performance.now();
   if(m.t==='ping'){netSend({t:'pong',ts:m.ts});return;}
-  if(m.t==='scheme'){if(SCH[m.s])NET.peerScheme=m.s;return;}
+  if(m.t==='scheme'){if(SCH[m.s]){NET.peerScheme=m.s;NET.peerKeys=okBind(m.k)?m.k:null;}return;}
   if(m.t==='pong'){NET.rtt=Math.round(performance.now()-m.ts);$('netBarPing').textContent='задержка '+NET.rtt+' мс';return;}
   if(NET.role!=='host'||m.t!=='k'||!(ACTS.includes(m.a)||m.a==='ok'||m.a==='pause'||/^qb[1-4]$/.test(m.a)))return;
   if(S.scene==='lobby'){if(m.d)lobbyAct('g',m.a);return;}
@@ -1567,56 +1594,70 @@ function netOnData(m){
 }
 // --- connection ---
 function netPC(){const pc=new RTCPeerConnection({iceServers:iceServers()});
-  pc.onconnectionstatechange=()=>{const st=pc.connectionState;
+  pc.onconnectionstatechange=()=>{if(pc!==NET.pc)return;const st=pc.connectionState;
     if(st==='connected'){NET.connected=true;clearTimeout(NET.failT);netStat(NET.role==='host'?'Напарник подключился!':'Подключено — играем! Ваш герой выбирается в лобби у хозяина.','ok');netConnected();}
     else if(st==='failed'){netLost('Не удалось соединиться напрямую. Попробуйте ещё раз или укажите TURN-сервер (ниже).');}
-    else if(st==='disconnected'){clearTimeout(NET.discT);NET.discT=setTimeout(()=>{if(pc.connectionState==='disconnected')netLost('Связь с напарником пропала.');},6000);}};
+    else if(st==='disconnected'){clearTimeout(NET.discT);NET.discT=setTimeout(()=>{if(pc===NET.pc&&pc.connectionState==='disconnected')netLost('Связь с напарником пропала.');},6000);}};
   return pc;}
-function netConnected(){$('netBar').hidden=false;$('netHud').hidden=false;$('netBarCode').textContent=NET.code;$('netBarRole').textContent=NET.role==='host'?'Вы — хозяин':'Вы — гость';
-  clearInterval(NET.pingT);NET.pingT=setInterval(()=>netSend({t:'ping',ts:performance.now()}),2000);setTimeout(()=>netSend({t:'scheme',s:NET.scheme}),300);
+function netConnected(){NET.relinking=false;$('netRe').hidden=true;clearInterval(NET.helloT);NET.lastRx=performance.now();clearInterval(NET.wdT);NET.wdT=setInterval(()=>{if(NET.connected&&performance.now()-NET.lastRx>7000)netLost('Связь с напарником пропала.');},1000);
+  netRemember();$('netBar').hidden=false;$('netHud').hidden=false;$('netBarCode').textContent=NET.code;$('netBarRole').textContent=NET.role==='host'?'Вы — хозяин':'Вы — гость';
+  clearInterval(NET.pingT);NET.pingT=setInterval(()=>netSend({t:'ping',ts:performance.now()}),2000);setTimeout(()=>netSend(Object.assign({t:'scheme'},myScheme())),300);
   if(NET.role==='host'){netShowPanel(false);if(S.scene!=='lobby'&&!NET.heroes)netOpenLobby();if(S.lobby)S.lobby.guest=true;
     if(NET.heroes&&S.scene!=='lobby')setBanner('Напарник снова с нами','#8fd18f');
     for(const s_ of NET.pc.getSenders())if(s_.track&&s_.track.kind==='video'){const p=s_.getParameters();p.encodings=p.encodings&&p.encodings.length?p.encodings:[{}];p.encodings[0].maxBitrate=9000000;p.degradationPreference='maintain-resolution';p.encodings[0].maxFramerate=30;p.encodings[0].scaleResolutionDownBy=1;s_.setParameters(p).catch(()=>{});}}
   else{netShowPanel(false);$('frame').classList.add('guest');$('netVideo').focus();}}
-function netLost(msg){NET.connected=false;netStat(msg,'err');
-  if(NET.role==='host'){if(S.scene==='play'&&!S.paused)togglePause(true);setBanner('Напарник отключился. Ждём — пусть снова войдёт по коду '+NET.code,C.cin);if(S.lobby)S.lobby.guest=false;
-    try{NET.pc&&NET.pc.close();}catch(e){}NET.pc=null;NET.dc=null;NET.gid='';}
-  else{$('frame').classList.remove('guest');netShowPanel(true);$('netJoinCode').value=NET.code;try{NET.pc&&NET.pc.close();}catch(e){}NET.pc=null;NET.dc=null;NET.role=null;if(NET.sig){NET.sig.close();NET.sig=null;}}}
+function netLost(msg){if(NET.role==='guest'&&NET.relinking)return;NET.connected=false;clearInterval(NET.wdT);clearInterval(NET.pingT);netStat(msg,'err');
+  if(NET.role==='host'){if(S.scene==='play'&&!S.paused)togglePause(true);setBanner('Связь с напарником пропала. Он вернётся сам — код тот же: '+NET.code,C.cin);if(S.lobby)S.lobby.guest=false;
+    const old=NET.pc;NET.pc=null;NET.dc=null;NET.gid='';try{old&&old.close();}catch(e){}}
+  else netRejoin();}
+// guest: rejoin the same room automatically after a drop, for up to 10 minutes
+function netRejoin(){NET.relinking=true;NET.connected=false;const old=NET.pc;NET.pc=null;NET.dc=null;NET.pend=[];try{old&&old.close();}catch(e){}
+  NET.gid=rid(10);const host=NETBASE+NET.code+'/h';if(!NET.sig)NET.sig=new Sig(m=>netGuestMsg(m,host));NET.sig.sub(NETBASE+NET.code+'/g/'+NET.gid);
+  if(!$('frame').classList.contains('guest'))$('frame').classList.add('guest');$('netRe').hidden=false;
+  let tries=0;const t0=Date.now();clearInterval(NET.helloT);
+  const say_=()=>{$('netReText').textContent='Переподключаемся к комнате '+NET.code+'… попытка '+tries+'. Если хозяин перезапустил игру — пусть снова нажмёт «Создать комнату», код останется тем же.';};
+  NET.helloT=setInterval(()=>{if(NET.pc||!NET.relinking){clearInterval(NET.helloT);return;}tries++;NET.sig.pub(host,{t:'hello',gid:NET.gid,pid:NET.pid});say_();
+    if(Date.now()-t0>600000){clearInterval(NET.helloT);$('netReText').textContent='Не получилось вернуться за 10 минут. Нажмите «Отменить» и войдите по коду заново.';}},2000);say_();}
+function netRemember(){try{localStorage.setItem(NET.role==='host'?'kuhnya-room':'kuhnya-lastroom',JSON.stringify({code:NET.code,ts:Date.now()}));}catch(e){}}
+function netRecall(k){try{const o=JSON.parse(localStorage.getItem(k)||'null');if(o&&/^\d{6}$/.test(o.code)&&Date.now()-o.ts<3*3600e3)return o.code;}catch(e){}return null;}
+$('netReStop').addEventListener('click',()=>{NET.relinking=false;clearInterval(NET.helloT);$('netRe').hidden=true;$('frame').classList.remove('guest');if(NET.sig){NET.sig.close();NET.sig=null;}NET.role=null;netShowPanel(true);$('netJoinCode').value=NET.code;netStat('Отменено. Можно войти по коду снова.');});
 function netWatchSig(){clearTimeout(NET.sigT);NET.sigT=setTimeout(()=>{if(NET.sig&&NET.sig.up===0)netStat('Не удаётся подключиться к серверам связи. Проверьте интернет. Внутри артефакта Claude сеть закрыта — откройте сетевую версию игры (файл или сайт).','err');},9000);}
 async function netHost(){initAudio();netVAC();if(!AC){netStat('Звук браузера не запустился — щёлкните по игре и попробуйте снова.','err');return;}
-  if(NET.sig)NET.sig.close();NET.role='host';NET.code=String(100000+Math.floor(Math.random()*900000));
+  if(NET.sig)NET.sig.close();NET.role='host';const prev=netRecall('kuhnya-room');NET.code=prev||String(100000+Math.floor(Math.random()*900000));netRemember();
   $('netHostBox').hidden=false;$('netCode').textContent=NET.code.slice(0,3)+' '+NET.code.slice(3);$('netCopy').hidden=!/^https?:/.test(location.protocol);
   netStat('Подключаемся к серверам связи…');await netMic();
   if(!NET.game){let src=cv;if(dpr<2){const cap=document.createElement('canvas');cap.width=W*2;cap.height=H*2;const cx2=cap.getContext('2d');cx2.imageSmoothingEnabled=false;NET.capDraw=()=>{cx2.drawImage(cv,0,0,cap.width,cap.height);};src=cap;}const v=src.captureStream(30).getVideoTracks()[0];try{v.contentHint='detail';}catch(e){}const dest=AC.createMediaStreamDestination();BUS.master.connect(dest);NET.game=new MediaStream([v,dest.stream.getAudioTracks()[0]]);}
   NET.sig=new Sig(m=>netHostMsg(m));NET.sig.sub(NETBASE+NET.code+'/h');netWatchSig();
-  setTimeout(()=>{if(NET.sig&&NET.sig.up>0&&!NET.connected)netStat('Комната открыта. Продиктуйте напарнику код '+NET.code.slice(0,3)+' '+NET.code.slice(3)+' — и ждите.','ok');},1500);
+  setTimeout(()=>{if(NET.sig&&NET.sig.up>0&&!NET.connected)netStat((prev?'Комната открыта с прежним кодом — если напарник ждёт переподключения, он зайдёт сам. ':'Комната открыта. ')+'Код '+NET.code.slice(0,3)+' '+NET.code.slice(3)+'.','ok');},1500);
   S.lobby={h:0,g:0,hr:false,gr:false,guest:false};}
 async function netHostMsg(m){
-  if(m.t==='hello'){if(NET.gid&&NET.gid!==m.gid&&NET.connected){NET.sig.pub(NETBASE+NET.code+'/g/'+m.gid,{t:'full'});return;}
+  if(m.t==='hello'){if(NET.gid&&NET.gid!==m.gid&&NET.connected&&!(m.pid&&m.pid===NET.peerPid)){NET.sig.pub(NETBASE+NET.code+'/g/'+m.gid,{t:'full',to:m.gid});return;}
+    if(m.pid)NET.peerPid=m.pid;
     if(NET.gid===m.gid&&NET.pc)return;
-    try{NET.pc&&NET.pc.close();}catch(e){}NET.gid=m.gid;const pc=NET.pc=netPC();const to=NETBASE+NET.code+'/g/'+m.gid;
+    const oldPc=NET.pc;NET.gid=m.gid;const pc=NET.pc=netPC();try{oldPc&&oldPc.close();}catch(e){}if(NET.connected){NET.connected=false;clearInterval(NET.wdT);}const to=NETBASE+NET.code+'/g/'+m.gid;
     for(const tr of NET.game.getTracks())pc.addTrack(tr,NET.game);
     try{const caps=RTCRtpSender.getCapabilities&&RTCRtpSender.getCapabilities('video');const vt=pc.getTransceivers().find(t=>t.sender.track&&t.sender.track.kind==='video');if(caps&&vt&&vt.setCodecPreferences){const pri=c=>/H264/i.test(c.mimeType)?0:/VP9/i.test(c.mimeType)?1:/VP8/i.test(c.mimeType)?2:3;vt.setCodecPreferences(caps.codecs.slice().sort((a,b)=>pri(a)-pri(b)));}}catch(e){}
     if(NET.mic)pc.addTrack(NET.micTrack,NET.mic);else pc.addTransceiver('audio',{direction:'recvonly'});
-    NET.dc=pc.createDataChannel('g');NET.dc.onmessage=ev=>{try{netOnData(JSON.parse(ev.data));}catch(e){}};
+    const dc=NET.dc=pc.createDataChannel('g');dc.onmessage=ev=>{try{netOnData(JSON.parse(ev.data));}catch(e){}};
     pc.ontrack=ev=>{if(ev.track.kind==='audio')netPeerVoice(ev.streams[0]||new MediaStream([ev.track]));};
-    pc.onicecandidate=ev=>{if(ev.candidate)NET.sig.pub(to,{t:'ice',c:ev.candidate.toJSON()});};
+    pc.onicecandidate=ev=>{if(ev.candidate)NET.sig.pub(to,{t:'ice',to:m.gid,c:ev.candidate.toJSON()});};
     NET.pend=[];const off=await pc.createOffer();await pc.setLocalDescription(off);
-    NET.sig.pub(to,{t:'offer',sdp:pc.localDescription.sdp,gs:NET.game.id});netStat('Напарник стучится… соединяемся.');
+    NET.sig.pub(to,{t:'offer',to:m.gid,sdp:pc.localDescription.sdp,gs:NET.game.id});netStat('Напарник стучится… соединяемся.');
     clearTimeout(NET.failT);NET.failT=setTimeout(()=>{if(!NET.connected)netStat('Соединение не устанавливается. Если так и не выйдет — нужен TURN-сервер (ниже).','err');},20000);}
   else if(m.gid===NET.gid&&NET.pc){
     if(m.t==='answer'){await NET.pc.setRemoteDescription({type:'answer',sdp:sdpFast(m.sdp)});for(const c of NET.pend)NET.pc.addIceCandidate(c).catch(()=>{});NET.pend=[];}
     else if(m.t==='ice'){if(NET.pc.remoteDescription)NET.pc.addIceCandidate(m.c).catch(()=>{});else NET.pend.push(m.c);}}}
 async function netJoin(){netVAC();const code=$('netJoinCode').value.replace(/\D/g,'');if(code.length!==6){netStat('Код — это 6 цифр.','err');return;}
   if(AC)try{AC.suspend();}catch(e){}if(mus.timer){clearInterval(mus.timer);mus.timer=null;}
-  if(NET.sig)NET.sig.close();NET.role='guest';NET.code=code;NET.gid=rid(10);NET.connected=false;NET.pend=[];
-  netStat('Ищем комнату '+code+'…');await netMic();
+  if(NET.sig)NET.sig.close();NET.role='guest';NET.code=code;NET.gid=rid(10);NET.connected=false;NET.pend=[];NET.relinking=false;if(!NET.pid){try{NET.pid=sessionStorage.getItem('kuhnya-pid');}catch(e){}if(!NET.pid){NET.pid=rid(10);try{sessionStorage.setItem('kuhnya-pid',NET.pid);}catch(e){}}}netRemember();
+  NET.fullN=0;netStat('Ищем комнату '+code+'…');await netMic();
   const me=NETBASE+code+'/g/'+NET.gid,host=NETBASE+code+'/h';
   NET.sig=new Sig(m=>netGuestMsg(m,host));NET.sig.sub(me);netWatchSig();
-  let tries=0;clearInterval(NET.helloT);NET.helloT=setInterval(()=>{if(NET.pc||NET.role!=='guest'){clearInterval(NET.helloT);return;}tries++;NET.sig.pub(host,{t:'hello',gid:NET.gid});
+  let tries=0;clearInterval(NET.helloT);NET.helloT=setInterval(()=>{if(NET.pc||NET.role!=='guest'){clearInterval(NET.helloT);return;}tries++;NET.sig.pub(host,{t:'hello',gid:NET.gid,pid:NET.pid});
     if(tries===20)netStat('Комната '+code+' не отвечает. Проверьте код и что у хозяина открыто окно «Создать комнату».','err');},1500);}
 async function netGuestMsg(m,host){
-  if(m.t==='full'){netStat('В этой комнате уже играют двое.','err');clearInterval(NET.helloT);return;}
+  if(m.to&&m.to!==NET.gid)return;
+  if(m.t==='full'){if(NET.relinking)return;NET.fullN=(NET.fullN||0)+1;netStat('В комнате сейчас занято место гостя. Если это вы до перезагрузки — подождите несколько секунд…','err');if(NET.fullN>12){clearInterval(NET.helloT);netStat('В этой комнате уже играют двое.','err');}return;}
   if(m.t==='offer'){if(NET.pc)return;clearInterval(NET.helloT);const pc=NET.pc=netPC();NET.pend=NET.pend||[];
     pc.ontrack=ev=>{const st=ev.streams[0];if(st&&st.id===m.gs){const v=$('netVideo');if(v.srcObject!==st){v.srcObject=st;v.play().catch(()=>{});}}else if(ev.track.kind==='audio')netPeerVoice(st||new MediaStream([ev.track]));};
     pc.ondatachannel=ev=>{NET.dc=ev.channel;NET.dc.onmessage=e2=>{try{netOnData(JSON.parse(e2.data));}catch(e){}};};
@@ -1635,7 +1676,7 @@ function lobbyAct(who,a){const L=S.lobby;if(!L)return;const me=who,other=who==='
   if(a==='left'||a==='right'){if(L[me+'r'])return;const want=a==='left'?-1:1,cur=L[me],nxt=cur===0?want:(cur===-want?0:cur);if(nxt!==0&&nxt===L[other]){sfx.bad();return;}L[me]=nxt;beep(600,.05,'sine',.04);return;}
   if(a==='ok'){if(L[me]===0){sfx.bad();return;}L[me+'r']=!L[me+'r'];beep(L[me+'r']?880:440,.08,'sine',.05);
     if(L.hr&&L.gr&&L.h!==L.g){NET.heroes={h:L.h<0?0:1,g:L.g<0?0:1};[523,659,784].forEach((f,i)=>setTimeout(()=>beep(f,.15,'sine',.06),i*90));
-      setTimeout(()=>{S.scene=SAVE.tutDone?'title':'prologue';if(!SAVE.tutDone)startPrologue(false);setBanner(P[NET.heroes.h].name+' — хозяин, '+P[NET.heroes.g].name+' — гость. Управление: у хозяина '+SCHNAME[NET.scheme]+(NET.peerScheme?', у гостя '+SCHNAME[NET.peerScheme]:''),'#8fd18f');},700);}
+      setTimeout(()=>{S.scene=SAVE.tutDone?'title':'prologue';if(!SAVE.tutDone)startPrologue(false);setBanner(P[NET.heroes.h].name+' — хозяин, '+P[NET.heroes.g].name+' — гость. Управление: у хозяина '+moveLabel(BIND[NET.scheme])+(NET.peerScheme?', у гостя '+moveLabel(bindOf(NET.heroes.g)):''),'#8fd18f');},700);}
     return;}
   if(a==='pause'&&who==='h'&&!L.hr){S.scene='menu';S.menu.page='main';}}
 function drawLobby(){const L=S.lobby||{h:-1,g:1};
@@ -1646,10 +1687,10 @@ function drawLobby(){const L=S.lobby||{h:-1,g:1};
     if(ok(k))ctx.drawImage(IMG[k],(Math.floor(S.blink*6)%4)*32,0,32,32,x-80,140,160,160);ctx.fillStyle=P[i].tag;ctx.font='bold 22px '+FB;ctx.fillText(P[i].name,x,334);});
   const row=(who,y,label,col)=>{const pos=L[who],x=pos===0?W/2:X[pos<0?0:1],r=L[who+'r'],gone=who==='g'&&!L.guest;ctx.globalAlpha=gone?.35:1;
     const w=200;rr(x-w/2,y,w,40,20,r?'#1f3a18':'#2a1f18');ctx.strokeStyle=r?'#8fd18f':col;ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(x-w/2+.5,y+.5,w-1,39,20);ctx.stroke();
-    ctx.fillStyle=r?'#8fd18f':C.ivory;ctx.font='bold 16px '+FB;ctx.fillText((pos!==0&&!r?'◂ ':'')+label+(who==='h'?' · '+SCHNAME[NET.scheme]:NET.peerScheme?' · '+SCHNAME[NET.peerScheme]:'')+(r?' — готов ✓':'')+(pos!==0&&!r?' ▸':''),x,y+26);ctx.globalAlpha=1;
+    ctx.fillStyle=r?'#8fd18f':C.ivory;ctx.font='bold 16px '+FB;ctx.fillText((pos!==0&&!r?'◂ ':'')+label+(who==='h'?' · '+moveLabel(BIND[NET.scheme]):NET.peerScheme?' · '+moveLabel(NET.peerKeys||BIND[NET.peerScheme]||BIND.wasd):'')+(r?' — готов ✓':'')+(pos!==0&&!r?' ▸':''),x,y+26);ctx.globalAlpha=1;
     if(pos===0&&!gone){ctx.fillStyle=C.muted;ctx.font='13px '+FB;ctx.fillText('◂ Егор   ·   Катюша ▸',x,y+58);}};
   row('h',380,'Хозяин','#d9a441');row('g',450,L.guest?'Гость':'Гость (ещё не зашёл)','#5aa0e0');
-  hint((NET.scheme==='wasd'?'A D':'← →')+' — выбрать героя   ·   Пробел — готов   ·   оба готовы — начинаем',H-24);}
+  hint(keyName(BIND[NET.scheme].left)+' '+keyName(BIND[NET.scheme].right)+' — выбрать героя   ·   Пробел — готов   ·   оба готовы — начинаем',H-24);}
 // --- UI wiring ---
 $('netHost').addEventListener('click',()=>netHost());
 $('netJoin').addEventListener('click',()=>netJoin());
@@ -1662,8 +1703,24 @@ $('micSens').addEventListener('input',()=>{$('micSensV').textContent=$('micSens'
 $('peerVol').addEventListener('input',()=>{if(NET.peerAudio)NET.peerAudio.volume=$('peerVol').value/100;});
 $('micOn').addEventListener('change',()=>{$('barMic').checked=$('micOn').checked;});$('barMic').addEventListener('change',()=>{$('micOn').checked=$('barMic').checked;});
 $('turnSave').addEventListener('click',()=>{try{localStorage.setItem('kuhnya-turn',JSON.stringify({url:$('turnUrl').value.trim(),user:$('turnUser').value.trim(),pass:$('turnPass').value.trim()}));}catch(e){}netStat('TURN-сервер сохранён. Он сработает при следующем соединении.','ok');});
-for(const el of document.querySelectorAll('input[name=sch]')){el.checked=el.value===NET.scheme;el.addEventListener('change',()=>{if(!el.checked)return;NET.scheme=el.value;try{localStorage.setItem('kuhnya-ctrl',el.value);}catch(e){}netSend({t:'scheme',s:el.value});netStat('Управление: '+SCHNAME[el.value]+'.','ok');});}
+for(const el of document.querySelectorAll('input[name=sch]')){el.checked=el.value===NET.scheme;el.addEventListener('change',()=>{if(!el.checked)return;NET.scheme=el.value;try{localStorage.setItem('kuhnya-ctrl',el.value);}catch(e){}netSend(Object.assign({t:'scheme'},myScheme()));netStat('Управление: '+SCHNAME[el.value]+'.','ok');});}
+// --- own key bindings (network play only) ---
+const ACTNAME={up:'Вверх',down:'Вниз',left:'Влево',right:'Вправо',use:'Взять / положить',work:'Работать (держать)',dash:'Рывок',skill:'Умение'};
+let bindWait=null;
+function drawKeyGrid(){const g=$('keyGrid');g.innerHTML='';for(const a of ACTS){const b=document.createElement('button');b.type='button';b.className='keybtn'+(bindWait===a?' wait':'');b.dataset.act=a;
+  const t=document.createElement('span');t.textContent=ACTNAME[a];const k=document.createElement('b');k.textContent=bindWait===a?'…':keyName(BIND.custom[a]);b.append(t,k);
+  b.addEventListener('click',()=>{bindWait=bindWait===a?null:a;$('keyMsg').textContent=bindWait?'Нажмите клавишу для «'+ACTNAME[a]+'» (Esc — отмена)':'';drawKeyGrid();if(bindWait)b.focus();});g.append(b);}}
+function useCustom(){NET.scheme='custom';$('schC').checked=true;try{localStorage.setItem('kuhnya-ctrl','custom');localStorage.setItem('kuhnya-keys',JSON.stringify(BIND.custom));}catch(e){}rebuildSch();netSend(Object.assign({t:'scheme'},myScheme()));}
+addEventListener('keydown',e=>{if(!bindWait)return;e.preventDefault();e.stopImmediatePropagation();const a=bindWait,c=e.code;
+  if(c==='Escape'){bindWait=null;$('keyMsg').textContent='';drawKeyGrid();return;}
+  if(RESERVED.test(c)||!/^[A-Za-z0-9]{1,24}$/.test(c)){$('keyMsg').textContent=keyName(c)+' занята игрой — выберите другую';return;}
+  const other=ACTS.find(x=>x!==a&&BIND.custom[x]===c);if(other)BIND.custom[other]=BIND.custom[a];BIND.custom[a]=c;bindWait=null;useCustom();
+  $('keyMsg').textContent=ACTNAME[a]+' — '+keyName(c)+(other?' (а «'+ACTNAME[other]+'» теперь '+keyName(BIND.custom[other])+')':'');drawKeyGrid();},true);
+addEventListener('keyup',e=>{if(bindWait||e.target&&e.target.classList&&e.target.classList.contains('keybtn'))e.stopImmediatePropagation();},true);
+$('keyReset').addEventListener('click',()=>{BIND.custom=Object.assign({},BIND[NET.scheme==='custom'?'wasd':NET.scheme]);bindWait=null;useCustom();$('keyMsg').textContent='Свои клавиши сброшены';drawKeyGrid();});
+drawKeyGrid();
 try{const v=localStorage.getItem('kuhnya-mic');if(v){$('micSens').value=v;$('micSensV').textContent=v;}}catch(e){}
+{const lr=netRecall('kuhnya-lastroom');if(lr&&!location.hash){$('netJoinCode').value=lr;netStat('Вы недавно были в комнате '+lr+' — нажмите «Войти», чтобы вернуться.');}}
 {const m=location.hash.match(/room=(\d{6})/);if(m){$('netJoinCode').value=m[1];netShowPanel(true);netStat('Вас пригласили в комнату '+m[1]+'. Нажмите «Войти».');}}
 
 // ---------- main menu ----------

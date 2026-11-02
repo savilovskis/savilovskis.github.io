@@ -2340,7 +2340,7 @@ MINI.liho={init(tier){const Tr=(x,y)=>({k:'tree',x,y,r:16}),Rk=(x,y,b)=>({k:b?'r
     for(const s of M.stones){const k=Math.min(1,s.t),x=s.x+(s.tx-s.x)*k,y=s.y+(s.ty-s.y)*k-Math.sin(k*Math.PI)*60;circ(x,y,4,'#9a9080');}
     ctx.restore();
     // moonlit darkness with two lights, then the eye's beam on top
-    ctx.save();ctx.fillStyle='rgba(2,4,10,.5)';ctx.beginPath();ctx.rect(0,LH_Y0-14,W,H);for(const [i,r] of [[1,210],[0,140]]){const p=M.pl[i];ctx.moveTo(p.x-cam+r,p.y-20);ctx.arc(p.x-cam,p.y-20,r,0,Math.PI*2,true);}ctx.fill('evenodd');ctx.restore();
+    {const dk=M.dk||(M.dk=document.createElement('canvas'));if(dk.width!==W*2){dk.width=W*2;dk.height=H*2;}const d=dk.getContext('2d');d.setTransform(2,0,0,2,0,0);d.globalCompositeOperation='source-over';d.clearRect(0,0,W,H);d.fillStyle='rgba(2,4,10,.5)';d.fillRect(0,LH_Y0-14,W,H);d.globalCompositeOperation='destination-out';for(const [i,r] of [[1,210],[0,140]]){const p=M.pl[i],x=p.x-cam,y=p.y-20,g=d.createRadialGradient(x,y,r*.55,x,y,r);g.addColorStop(0,'rgba(0,0,0,1)');g.addColorStop(1,'rgba(0,0,0,0)');d.fillStyle=g;d.fillRect(x-r,y-r,2*r,2*r);}ctx.drawImage(dk,0,0,W,H);}
     const ex=E.x-cam,bg=ctx.createRadialGradient(ex,LH_EY,10,ex,LH_EY,640);bg.addColorStop(0,'rgba(255,60,40,.36)');bg.addColorStop(1,'rgba(255,60,40,0)');ctx.fillStyle=bg;ctx.beginPath();ctx.moveTo(ex,LH_EY);ctx.arc(ex,LH_EY,640,E.a-.3,E.a+.3);ctx.closePath();ctx.fill();
     circ(ex,LH_EY,16,'#efe3c8');circ(ex+Math.cos(E.a)*5,LH_EY+Math.sin(E.a)*5,9,'#c0392b');circ(ex+Math.cos(E.a)*6,LH_EY+Math.sin(E.a)*6,3.5,'#000');
     if(M.caught>0){ctx.fillStyle='rgba(120,0,0,'+M.caught*.3+')';ctx.fillRect(0,0,W,H);}

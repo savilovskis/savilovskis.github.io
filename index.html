@@ -1921,7 +1921,7 @@ MINI.voda={init(tier){const sp=1+tier*.15;
     const M={tier,L:5420,SPR:5350,plats:vodaLevel(tier),cam:0,got:0,drops:0,falls:0,cp:0,time:200-tier*15,shake:0,
       mood:{trk:'tuman',st:'play',bpm:92,tension:0,inst:'reed'},
       lan:[{x:80,y:470,lit:true},{x:1650,y:470},{x:3300,y:322},{x:3930,y:470}],
-      ropes:[{x:3160,top:322,bot:470,open:false},{x:4900,top:326,bot:470,open:false}],
+      ropes:[{x:3154,top:322,bot:470,open:false},{x:4894,top:326,bot:470,open:false}],
       thorns:[{x0:3990,x1:4070,y:470},{x0:4330,x1:4470,y:470},{x0:4640,x1:4720,y:470}],
       wisps:[{cx:2060,cy:360,ax:46,ay:36,sp:1.6*sp,ph:0},{cx:2790,cy:372,ax:0,ay:56,sp:1.4*sp,ph:1},{cx:3660,cy:440,ax:130,ay:6,sp:1*sp,ph:2},{cx:4030,cy:330,ax:40,ay:30,sp:2*sp,ph:3},{cx:4460,cy:300,ax:60,ay:24,sp:1.5*sp,ph:.5},{cx:5100,cy:262,ax:150,ay:20,sp:.9*sp,ph:1.7}],
       berries:[[400,440],[520,440],[855,370],[1200,440],[1960,400],[2180,400],[2420,440],[2650,400],[3060,440],[3350,290],[3450,290],[3650,370],[3940,440],[4310,370],[4440,300],[5000,290],[5150,290]].map(([x,y])=>({x,y})),
@@ -1942,7 +1942,7 @@ MINI.voda={init(tier){const sp=1+tier*.15;
     M.pl.forEach((p,i)=>{if(p.fin)return;const k=HK(i),o=M.pl[1-i];p.inv=Math.max(0,p.inv-dt);p.jb=Math.max(0,p.jb-dt);p.co=Math.max(0,p.co-dt);
       if(p.on){if(p.on.k==='h'&&p.on.down>0)p.on=null;else{p.x+=p.on.dx||0;p.y=p.on===o?o.y-46:p.on.y;}}
       // rope
-      const rope=M.ropes.find(r=>r.open&&Math.abs(p.x-r.x)<22&&p.y>r.top+4&&p.y<=r.bot+2);
+      const rope=M.ropes.find(r=>r.open&&Math.abs(p.x-r.x)<34&&p.y>r.top+4&&p.y<=r.bot+2);
       if(rope&&k.u&&!p.clb){p.clb=true;p.vy=0;p.on=null;}
       if(p.clb){if(!rope){p.clb=false;}else{p.x+=(rope.x-p.x)*Math.min(1,dt*12);p.y+=((k.d?1:0)-(k.u?1:0))*170*dt;p.run=k.u||k.d;
         if(p.y<=rope.top+4){p.y=rope.top;p.x=rope.x+24;p.clb=false;p.on=M.plats.find(q=>q.k==='g'&&q.y===rope.top&&p.x>=q.x&&p.x<=q.x+q.w)||null;p.vy=0;}

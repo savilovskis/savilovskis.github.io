@@ -387,7 +387,7 @@ const STAFF=[
  {id:'witch',name:'Домовой',desc:'Седой хозяин избы. Обходит кухню и выгоняет Теней, что подойдут к нему близко. При нём нечисть шалит реже.',price:1300,wage:28,lvl:4,spr:'katya_v3'},
  {id:'waiter',name:'Двое из ларца',desc:'«Одинаковы с лица». Сами забирают готовые блюда из котлов, печей и с окошка и несут гостям.',price:1600,wage:35,lvl:4,spr:'egor_v2'},
  {id:'gusl',name:'Аука',desc:'Лесной дух-аукальщик. Тихонько вторит гуслям у стола подачи: под эхо гости теряют терпение на 30% медленнее.',price:2200,wage:40,lvl:5,spr:'egor_v4'},
- {id:'cookw',name:'Кикимора',desc:'В хорошем доме кикимора не пакостит, а помогает: сама закладывает продукты в свободные котлы, печи и сковороды под заказы гостей.',price:4500,wage:70,lvl:7,spr:'katya_v1'}];
+ {id:'cookw',name:'Кикимора',desc:'Кикимору надо задабривать. Пока сыта — сама закладывает продукты в свободные котлы, печи и сковороды под заказы гостей. Сытость тает за минуту-полторы, потом она садится в угол и капризничает. Принесите ей любое блюдо и нажмите «взять» рядом с ней, а её любимое блюдо насытит надолго.',price:4500,wage:70,lvl:7,spr:'katya_v1'}];
 const RECIPES_LOC=[{id:'kisel',loc:'moroz',price:1200,lvl:1},{id:'kulesh',loc:'boloto',price:1800,lvl:1},{id:'kurnik',loc:'koshey',price:2600,lvl:1},{id:'bliny',loc:'sky',price:3200,lvl:1,need:'pan'}];
 const RECIPES=[
  {id:'glazun',price:300,lvl:2,need:'pan'},{id:'medhleb',price:450,lvl:2},{id:'omlet',price:650,lvl:3,need:'pan'},
@@ -489,9 +489,10 @@ const TNAMES=['Изба у трёх сосен','Харчевня','Тракти
 const tname=l=>TNAMES[Math.min(l,TNAMES.length)-1];
 const upg=id=>SAVE.upg[id]|0;
 const staffOn=id=>!!(SAVE.staff[id]&&SAVE.staff[id].on);
+const KIKIFULL=[50,60,75];
 const STLV={cook:[1,1.35,1.7],stoker:[1.7,1.85,2],witch:[2.4,2.8,3.2],waiter:[1,1.15,1.3],gusl:[.7,.62,.55],cookw:[6,4.5,3],studen:[1.6,1.8,2],bolotnik:[2,2.5,3],ognevik:[1.15,1.22,1.3],vihor:[1.1,1.15,1.2]};
 const STTXT={cook:v=>'рубит со скоростью ×'+v,stoker:v=>'раздувает жар: готовка ×'+v,witch:v=>'гонит Теней в радиусе '+v+' клетки',waiter:v=>'ходит быстрее ×'+v,gusl:v=>'гости теряют терпение на '+Math.round((1-v)*100)+'% медленнее',
-  cookw:v=>'ставит блюдо раз в '+v+' с',studen:v=>'блюда горят дольше ×'+v,bolotnik:v=>'шалости реже в '+v+' раза',ognevik:v=>'готовка быстрее ×'+v,vihor:v=>'герои ходят быстрее ×'+v};
+  cookw:v=>'ставит блюдо раз в '+v+' с, сыта '+KIKIFULL[STLV.cookw.indexOf(v)]+' с',studen:v=>'блюда горят дольше ×'+v,bolotnik:v=>'шалости реже в '+v+' раза',ognevik:v=>'готовка быстрее ×'+v,vihor:v=>'герои ходят быстрее ×'+v};
 const stLv=id=>SAVE.staff[id]?Math.max(1,Math.min(3,SAVE.staffLv[id]|0||1)):0;
 const SV=id=>{const a=STLV[id];return a?a[Math.max(0,stLv(id)-1)]:1;};
 const stDef=id=>STAFF.find(x=>x.id===id);
@@ -636,7 +637,7 @@ function startNight(n){
     scareAt:N.scare?rnd(.35,.8)*N.len:-1,whT:rnd(10,18),knockT:rnd(18,30),shadowT:N.shadows?14+(buff('amulet')?60:0):-1,flickT:rnd(8,16),hbT:0,
     evT:T&&T.events?rnd(6,10):LOC.mist?rnd(14,20):rnd(26,38),featherT:(T&&T.feathers)||LOC.feathers||buff('pero')?6:-1,clothT:buff('cloth')?35:-1,
     viyQ:N.viy?(T&&T.viy2?[.32,.7]:[.55]):[]});
-  spawnStaff();
+  spawnStaff();S.kikiFull=staffOn('cookw')?KIKIFULL[stLv('cookw')-1]:0;S.kikiMax=S.kikiFull;S.kikiFav=null;
   setBanner((n<3?['Ночь первая','Ночь вторая','Ночь третья'][n]:'Ночь '+(n+1))+(T?'. '+T.name:'. '+LOC.name),T?T.col:null);
   if(used.length)setTimeout(()=>{if(S.scene==='play')setBanner('Действует: '+used.join(', '),'#8fd18f');},3000);
   startDrone();
@@ -779,7 +780,13 @@ function fits(contents,item,rec){
 function matchRec(contents,rec){for(const [d,ing] of Object.entries(rec)){if(ing.length===contents.length&&[...ing].sort().join()===[...contents].sort().join())return d;}return null;}
 function target(p){return st[(p.x+p.fx)+','+(p.y+p.fy)];}
 const isCooker=s=>s&&(s.kind==='pot'||s.kind==='oven'||s.kind==='pan');
+function feedKiki(p){const k=S.npcs.find(n=>n.role==='cookw');if(!k||!p.hold||!DISH[p.hold])return false;
+  if(Math.abs(k.x-p.x)+Math.abs(k.y-p.y)>1||(S.kikiFull>.35&&!k.hungry))return false;
+  const fav=p.hold===S.kikiFav,dur=KIKIFULL[stLv('cookw')-1]*(fav?1.6:1);S.kikiFull=dur;S.kikiMax=dur;k.hungry=false;p.hold=null;S.kikiFav=null;
+  for(let i=0;i<10;i++)S.parts.push({x:k.px*TILE+TILE/2,y:MAPY+k.py*TILE,vx:rnd(-60,60),vy:rnd(-140,-60),life:1,heart:true});
+  setBanner(fav?'Любимое блюдо! Кикимора довольна надолго и снова за работой':'Кикимора поела и снова за работой','#9fc8a8');sfx.serve();return true;}
 function interact(p){
+  if(feedKiki(p))return;
   const s=target(p); if(!s)return;
   switch(s.kind){
     case 'counter':
@@ -922,6 +929,8 @@ function updateNpc(n,dt){
     return;}
   if(n.role==='witch'){n.idle=1.2;const [x,y]=floorTiles[Math.floor(Math.random()*floorTiles.length)];npcGoTile(n,x,y,'idle');return;}
   if(n.role==='cookw'){
+    if(S.kikiFull<=0){if(!n.hungry){n.hungry=true;const kn=DORDER.filter(d=>known(d));S.kikiFav=kn[Math.floor(Math.random()*kn.length)];setBanner('Кикимора проголодалась и капризничает. Принесите ей поесть — больше всего хочет: '+DISH[S.kikiFav].name,'#c06080');beep(300,.2,'triangle',.05);}
+      const h=npcHome('cookw');if(n.x!==h[0]||n.y!==h[1])npcGoTile(n,h[0],h[1],'idle');return;}
     if(n.cd>0)return;
     const need={};for(const o of orders)need[o.dish]=(need[o.dish]||0)+1;
     for(const [,s] of Object.entries(st)){if(isCooker(s)&&s.product&&(s.state==='cook'||s.state==='done'))need[s.product]=(need[s.product]||0)-1;if(s.kind==='counter'&&s.item&&need[s.item])need[s.item]--;}
@@ -1066,6 +1075,7 @@ function update(dt){
     S.viyQ.shift();S.viyOn=true;const d=N.dishes[Math.floor(Math.random()*N.dishes.length)];
     const vp=DIFF[S.diff].viyPat*(1+PV('k_viy'));orders.push({dish:d,g:'viy',t:vp,max:vp,boss:true});setBanner('Вий вошёл в трактир. Не смотрите ему в глаза',C.cin);sfx.scream();S.shake=.6;
   }
+  if(staffOn('cookw')&&S.scene==='play'&&S.kikiFull>0)S.kikiFull=Math.max(0,S.kikiFull-dt);
   for(const o of orders)o.t-=dt*(evOn('moon')?1.6:1)*(staffOn('gusl')?SV('gusl'):1);
   for(const o of orders.filter(o=>o.t<=0)){
     if(o.boss&&buff('igla')&&!S.iglaUsed){S.iglaUsed=true;S.viyOn=false;setBanner('Вий ушёл голодным, но Кощеева игла отвела проклятье','#c9a0ff');sfx.bad();continue;}
@@ -1404,6 +1414,9 @@ function drawNpc(n){
   ell(x,yb-5,11,4,'rgba(0,0,0,.4)');
   drawWorker(n.role,x,yb-2,50,n.fx,n.fy,n.moving||!!n.fan||n.role==='gusl',S.blink);
   if(n.hold)drawItem(n.hold,x,yb-54,.7);
+  if(n.role==='cookw'&&S.scene==='play'){const k=S.kikiMax?Math.max(0,S.kikiFull/S.kikiMax):0;rr(x-18,yb-66,36,5,2,'rgba(5,3,3,.75)');rr(x-17,yb-65,34*k,3,1,k>.35?'#8fd18f':k>0?'#e0a040':'#c03030');
+    if(n.hungry){const bx=x+22,by=yb-92+Math.sin(S.blink*4)*2;rr(bx-24,by-20,48,40,10,'rgba(239,227,200,.95)');ctx.fillStyle='rgba(239,227,200,.95)';ctx.beginPath();ctx.moveTo(bx-14,by+18);ctx.lineTo(bx-22,by+30);ctx.lineTo(bx-4,by+18);ctx.fill();if(S.kikiFav)drawItem(S.kikiFav,bx,by-2,.75);
+      ctx.fillStyle='#8e1a12';ctx.font='bold 9px '+FB;ctx.textAlign='center';ctx.fillText('есть хочу!',bx,by+16);}}
   if(n.role==='gusl'){rr(x+8,yb-26,16,10,3,'#a0682a');ctx.strokeStyle='#ffe08a';ctx.lineWidth=1;for(let i=0;i<3;i++){ctx.beginPath();ctx.moveTo(x+10,yb-24+i*3);ctx.lineTo(x+22,yb-24+i*3);ctx.stroke();}}
   ctx.font='bold 10px '+FB;ctx.textAlign='center';const w=ctx.measureText(R_.name).width+8;rr(x-w/2,yb+1,w,13,4,'rgba(5,3,3,.75)');ctx.fillStyle=R_.col;ctx.fillText(R_.name,x,yb+11);
 }

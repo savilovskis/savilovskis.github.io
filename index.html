@@ -237,7 +237,7 @@ const lc=document.createElement('canvas');lc.width=W*dpr;lc.height=H*dpr;const l
 const scareBox=document.getElementById('scare');
 
 const IMG={};for(const k in IMGSRC){IMG[k]=new Image();IMG[k].src=IMGSRC[k];}
-const ok=k=>IMG[k]&&IMG[k].complete&&IMG[k].naturalWidth>0;
+const ok=k=>{const i=IMG[k];return !!i&&(i.tagName==='CANVAS'||(i.complete&&i.naturalWidth>0));};
 const floorPats={};
 function getFloorPat(key){
   key=key||'floor';if(floorPats[key])return floorPats[key];if(!ok(key))return null;
@@ -249,15 +249,17 @@ const GS={bes:{n:8,fw:40,fh:40,dy:.07},kosh:{n:4,fw:64,fh:64},soreg:{n:4,fw:64,f
 const CRATE={m:'mush',f:'fish',k:'berry',r:'root',d:'dough',h:'honey',e:'egg',l:'milk',b:'meat'};
 const CHOP={mush:'mush_c',fish:'fish_c',root:'root_c',meat:'meat_c'};
 const REC={
- pot:{pohl:['mush_c','mush_c'],ukha:['fish_c','root_c'],sbiten:['honey','berry']},
- oven:{pirog:['dough','berry'],zapech:['fish_c','root'],medhleb:['dough','honey'],zharkoe:['meat_c','root_c']},
- pan:{glazun:['egg','egg'],omlet:['egg','milk'],klyar:['fish_c','egg'],shashlyk:['meat_c','mush_c']}};
+ pot:{pohl:['mush_c','mush_c'],ukha:['fish_c','root_c'],sbiten:['honey','berry'],kisel:['berry','milk'],kulesh:['mush_c','meat_c']},
+ oven:{pirog:['dough','berry'],zapech:['fish_c','root'],medhleb:['dough','honey'],zharkoe:['meat_c','root_c'],kurnik:['dough','meat_c']},
+ pan:{glazun:['egg','egg'],omlet:['egg','milk'],klyar:['fish_c','egg'],shashlyk:['meat_c','mush_c'],bliny:['milk','honey']}};
 const COOKT={pot:6,oven:7,pan:4.5};
 const STNAME={pot:'котёл',oven:'печь',pan:'сковорода'};
 const INAME={mush:'гриб',mush_c:'резаные грибы',fish:'рыбу',fish_c:'резаную рыбу',berry:'вишню',root:'морковь',root_c:'резаную морковь',dough:'тесто',honey:'мёд',egg:'яйцо',milk:'молоко',meat:'мясо',meat_c:'резаное мясо',coal:'уголь',pohl:'похлёбку',pirog:'пирог',zapech:'рыбу',sbiten:'сбитень',ukha:'уху',glazun:'глазунью',omlet:'омлет',klyar:'рыбу в кляре',shashlyk:'шашлык',zharkoe:'жаркое',medhleb:'каравай'};
 const ING={mush:'гриб',mush_c:'резаный гриб',fish:'рыба',fish_c:'резаная рыба',berry:'вишня',root:'морковь',root_c:'резаная морковь',dough:'тесто',honey:'мёд',egg:'яйцо',milk:'молоко',meat:'мясо',meat_c:'резаное мясо'};
 const DISH={pohl:{name:'Грибная похлёбка',g:'kust',price:8},pirog:{name:'Пирог с вишней',g:'rus',price:10},zapech:{name:'Запечённая рыба',g:'baun',price:13},sbiten:{name:'Сбитень',g:'kolob',price:9},ukha:{name:'Уха',g:'gam',price:13},
- glazun:{name:'Глазунья',g:'snow',price:7},medhleb:{name:'Медовый каравай',g:'bereg',price:12},omlet:{name:'Омлет',g:'alk',price:11},klyar:{name:'Рыба в кляре',g:'wolf',price:15},shashlyk:{name:'Шашлык',g:'chort',price:17},zharkoe:{name:'Жаркое',g:'bear',price:20}};
+ glazun:{name:'Глазунья',g:'snow',price:7},medhleb:{name:'Медовый каравай',g:'bereg',price:12},omlet:{name:'Омлет',g:'alk',price:11},klyar:{name:'Рыба в кляре',g:'wolf',price:15},shashlyk:{name:'Шашлык',g:'chort',price:17},zharkoe:{name:'Жаркое',g:'bear',price:20},
+ kisel:{name:'Клюквенный кисель',g:'kosh',price:16},kulesh:{name:'Кулеш с грибами',g:'soreg',price:18},kurnik:{name:'Кощеев курник',g:'ogre',price:22},bliny:{name:'Блины с мёдом',g:'mare',price:20}};
+const DICON={kisel:['sbiten','rgba(205,25,70,1)'],kulesh:['pohl','rgba(130,95,35,1)'],kurnik:['pirog','rgba(120,55,25,1)'],bliny:['glazun','rgba(255,185,60,1)']};
 const DORDER=Object.keys(DISH);
 const BASE_DISHES=['pohl','pirog','zapech','sbiten','ukha'];
 const GNAME={bes:'Бесёнок',kosh:'Ледяной великан',soreg:'Земун',mare:'Сварожья кобылица',hel:'Мара',kust:'Кустица',rus:'Русалка',baun:'Кот Баюн',kolob:'Колобок',gam:'Гамаюн',viy:'Вий',snow:'Снежка',alk:'Алконост',bear:'Медведь-шатун',chort:'Чёрт',bereg:'Берегиня',wolf:'Серый Волк',ogre:'Людоед'};
@@ -325,16 +327,23 @@ function evOn(id){return S.event&&S.event.id===id;}
 let SLOT=1;try{SLOT=Math.min(3,Math.max(1,+localStorage.getItem('kuhnya-slot')||1));}catch(e){}
 const slotKey=n=>n===1?'kuhnya-save':'kuhnya-save-'+n;
 let BOOT='';try{BOOT=sessionStorage.getItem('kuhnya-boot')||'';sessionStorage.removeItem('kuhnya-boot');}catch(e){}
-const SAVE={ts:0,coins:0,xp:0,night:0,tutDone:false,finalSeen:false,streak:0,upg:{},staff:{},rec:[],inv:{},free:{koshey:0,fire:0},daily:{last:'',streak:0},
+const SAVE={v:3,perkLv:{},ts:0,coins:0,xp:0,night:0,tutDone:false,finalSeen:false,streak:0,upg:{},staff:{},rec:[],inv:{},free:{koshey:0,fire:0},daily:{last:'',streak:0},
   stats:{nights:0,guests:0,earned:0,bestNight:0,bestRev:0,bestCombo:0,clean:0,viy:0,gold:0,banish:0},locs:['les'],loc:'les',perks:[],ach:[],tales:[],facts:[],deduce:[],epi:false,eco:2,
   owned:{egor:['v3'],katya:['v4'],kitchen:['dub'],tools:['prost']},eq:{egor:'v3',katya:'v4',kitchen:'dub',tools:'prost'},mus:['title','play'],musEq:{menu:'title',night:'play'}};
-try{const sv=JSON.parse(localStorage.getItem(slotKey(SLOT))||'null');if(sv){
+// saves are never thrown away: a daily copy of every slot is kept, and a broken slot falls back to that copy
+function readSlot(n){let raw=null;try{raw=localStorage.getItem(slotKey(n));}catch(e){}
+  try{const v=JSON.parse(raw||'null');if(v&&typeof v==='object'){try{const b=JSON.parse(localStorage.getItem('kuhnya-backup-'+n)||'null');if(!b||b.day!==new Date().toDateString())localStorage.setItem('kuhnya-backup-'+n,JSON.stringify({day:new Date().toDateString(),raw}));}catch(e){}return v;}}catch(e){}
+  try{const b=JSON.parse(localStorage.getItem('kuhnya-backup-'+n)||'null');if(b&&b.raw)return JSON.parse(b.raw);}catch(e){}return null;}
+try{const sv=readSlot(SLOT);if(sv){
   if(typeof sv.ts==='number')SAVE.ts=sv.ts;
   for(const k of ['coins','xp','night','streak'])if(typeof sv[k]==='number')SAVE[k]=sv[k];
   for(const k of ['tutDone','finalSeen'])SAVE[k]=!!sv[k];
   for(const k of ['upg','staff','inv','free','daily','stats'])if(sv[k]&&typeof sv[k]==='object')Object.assign(SAVE[k],sv[k]);
   SAVE.epi=!!sv.epi;for(const k of ['rec','locs','perks','ach','tales','facts','deduce'])if(Array.isArray(sv[k]))SAVE[k]=[...new Set(SAVE[k].concat(sv[k]))];
   if(typeof sv.loc==='string')SAVE.loc=sv.loc;
+  if(sv.perkLv&&typeof sv.perkLv==='object')for(const k in sv.perkLv)SAVE.perkLv[k]=Math.max(SAVE.perkLv[k]|0,sv.perkLv[k]|0);
+  for(const id of SAVE.perks)SAVE.perkLv[id]=Math.max(SAVE.perkLv[id]|0,1);
+  for(const k in sv)if(!(k in SAVE))SAVE[k]=sv[k];
   if(Array.isArray(sv.mus))SAVE.mus=[...new Set(SAVE.mus.concat(sv.mus))];if(sv.musEq)for(const k of ['menu','night'])if(SAVE.mus.includes(sv.musEq[k]))SAVE.musEq[k]=sv.musEq[k];
   for(const k in SAVE.owned){if(sv.owned&&Array.isArray(sv.owned[k]))SAVE.owned[k]=[...new Set(SAVE.owned[k].concat(sv.owned[k]))];if(sv.eq&&sv.eq[k]&&SAVE.owned[k].includes(sv.eq[k]))SAVE.eq[k]=sv.eq[k];}
   // the economy was rebalanced: old wallets are scaled down once
@@ -346,10 +355,10 @@ function slotInfo(n){try{const v=JSON.parse(localStorage.getItem(slotKey(n))||'n
 function switchSlot(n,fresh){try{localStorage.setItem('kuhnya-slot',n);if(fresh)localStorage.removeItem(slotKey(n));sessionStorage.setItem('kuhnya-boot',fresh?'new':'cont');}catch(e){}location.reload();}
 const geo=(b,n)=>Array.from({length:n},(_,i)=>Math.round(b*Math.pow(1.75,i)/10)*10);
 const COSM=[
- {key:'egor',title:'Наряды Егора',items:[{id:'v3',name:'Лесник',price:0},{id:'v1',name:'Рыбак',price:300},{id:'v0',name:'Кузнец',price:450},{id:'v4',name:'Купец',price:650},{id:'v2',name:'Седой мельник',price:900}]},
- {key:'katya',title:'Наряды Катюши',items:[{id:'v4',name:'Рябинушка',price:0},{id:'v1',name:'Василиса',price:300},{id:'v3',name:'Травница',price:450},{id:'v0',name:'Снегурочка',price:650},{id:'v2',name:'Ночница',price:900}]},
- {key:'kitchen',title:'Кухня',items:[{id:'dub',name:'Дубовая изба',price:0},{id:'gornica',name:'Светлая горница',price:600},{id:'izba',name:'Чёрная изба',price:900},{id:'boloto',short:'Корчма Водяного',name:'Болотная',price:1400},{id:'podz',name:'Кощеево подземелье',price:2200}]},
- {key:'tools',title:'Роспись утвари',items:[{id:'prost',name:'Простая',price:0},{id:'med',name:'Медная',price:500},{id:'hohloma',name:'Хохлома',price:1000},{id:'koldun',name:'Колдовская',price:1600}]}];
+ {key:'egor',title:'Наряды Егора',items:[{id:'v3',name:'Лесник',price:0},{id:'v1',name:'Рыбак',price:300},{id:'v0',name:'Кузнец',price:450},{id:'v4',name:'Купец',price:650},{id:'v2',name:'Седой мельник',price:900},{id:'moroz',loc:'moroz',name:'Морозный кафтан',price:1200},{id:'boloto',loc:'boloto',name:'Болотный зипун',price:1600},{id:'koshey',loc:'koshey',name:'Кощеев латник',price:2200},{id:'sky',loc:'sky',name:'Жар-птичий',price:2800}]},
+ {key:'katya',title:'Наряды Катюши',items:[{id:'v4',name:'Рябинушка',price:0},{id:'v1',name:'Василиса',price:300},{id:'v3',name:'Травница',price:450},{id:'v0',name:'Снегурочка',price:650},{id:'v2',name:'Ночница',price:900},{id:'moroz',loc:'moroz',name:'Снежная царевна',price:1200},{id:'boloto',loc:'boloto',name:'Русалочья',price:1600},{id:'koshey',loc:'koshey',name:'Марья Моревна',price:2200},{id:'sky',loc:'sky',name:'Жар-птица',price:2800}]},
+ {key:'kitchen',title:'Кухня',items:[{id:'dub',name:'Дубовая изба',price:0},{id:'gornica',name:'Светлая горница',price:600},{id:'izba',name:'Чёрная изба',price:900},{id:'boloto',short:'Корчма Водяного',name:'Болотная',price:1400},{id:'podz',name:'Кощеево подземелье',price:2200},{id:'zimn',loc:'moroz',name:'Зимняя горница',price:1500},{id:'mshan',loc:'boloto',name:'Моховая изба',price:1900},{id:'chertog',loc:'koshey',name:'Кощеев чертог',price:2600},{id:'oblaka',loc:'sky',name:'Облачная горница',price:3200}]},
+ {key:'tools',title:'Роспись утвари',items:[{id:'prost',name:'Простая',price:0},{id:'med',name:'Медная',price:500},{id:'hohloma',name:'Хохлома',price:1000},{id:'koldun',name:'Колдовская',price:1600},{id:'gzhel',loc:'moroz',name:'Гжель',price:1300},{id:'bronza',loc:'boloto',name:'Болотная бронза',price:1700},{id:'chern',loc:'koshey',name:'Кощеева чернь',price:2400},{id:'zhar',loc:'sky',name:'Жар-птица',price:3000}]}];
 const UPG=[
  {id:'pot',name:'Скороварка',desc:'Котлы варят на 20% быстрее за уровень.',cost:geo(180,5)},
  {id:'oven',name:'Жаркая печь',desc:'Печи пекут на 20% быстрее за уровень.',cost:geo(180,5)},
@@ -360,8 +369,17 @@ const UPG=[
  {id:'tables',name:'Резные столы',desc:'Гости платят на 8% больше за уровень.',cost:geo(300,5)},
  {id:'sign',name:'Расписная вывеска',desc:'Гостей на 10% больше, щедрые гости чаще. Больше гостей — больше выручки, но и суеты.',cost:geo(260,5)},
  {id:'pan',name:'Сковорода',desc:'Ур. 1 — сковорода справа у печей, ур. 2 — вторая. Нужна для новых рецептов.',cost:[600,1400],lvl:2},
+ {id:'ledn',loc:'moroz',name:'Ледяной погреб',desc:'Окрик Егора и улыбка Катюши перезаряжаются на 8% быстрее за уровень.',cost:geo(900,3)},
+ {id:'most',loc:'boloto',name:'Мостки и фонари',desc:'Тени ходят на 6% медленнее за уровень.',cost:geo(1200,3)},
+ {id:'kazna',loc:'koshey',name:'Кощеева казна',desc:'После каждой ночи кошель растёт на 1% за уровень (до 150 грошей за уровень).',cost:geo(2000,3)},
+ {id:'oblako',loc:'sky',name:'Облачная перина',desc:'Окно комбо дольше на 2 секунды за уровень.',cost:geo(2600,3)},
  {id:'annex',name:'Пристроить сруб',desc:'Трактир растёт: +4% ко всей выручке и славе за каждый сруб. Строить можно бесконечно, но каждый дороже.',cost:'inf',lvl:2}];
 const annexCost=l=>Math.round(1500*Math.pow(1.6,l)/10)*10;
+const STAFF_LOC=[
+ {id:'studen',loc:'moroz',name:'Студенец',desc:'Дух студёного колодца. Остужает готовое: блюда горят на 60% дольше. Помогает незримо, по кухне не ходит.',price:2400,wage:30,lvl:1,passive:true},
+ {id:'bolotnik',loc:'boloto',name:'Болотник',desc:'Хозяин трясины договаривается с нечистью: шалости (задутая лучина, ноги задом наперёд) случаются вдвое реже. Помогает незримо.',price:3000,wage:38,lvl:1,passive:true},
+ {id:'ognevik',loc:'koshey',name:'Огневик',desc:'Дух подземного жара. Котлы, печи и сковороды готовят на 15% быстрее. Помогает незримо.',price:4200,wage:48,lvl:1,passive:true},
+ {id:'vihor',loc:'sky',name:'Вихорь',desc:'Дух ветра подгоняет в спину: Егор и Катюша ходят на 10% быстрее. Помогает незримо.',price:5200,wage:55,lvl:1,passive:true}];
 const STAFF=[
  {id:'cook',name:'Жихарь',desc:'Маленький домашний дух, запечный хлопотун. Сидит у разделочных досок и сам рубит всё, что на них лежит.',price:500,wage:12,lvl:2,spr:'egor_v1'},
  {id:'stoker',name:'Овинник',desc:'Чёрный косматый дух овина, хозяин огня. Ходит от печи к котлу и раздувает жар: где он стоит, готовится на 70% быстрее. Готовое горит в 2,5 раза дольше.',price:900,wage:20,lvl:3,spr:'egor_v0'},
@@ -369,6 +387,7 @@ const STAFF=[
  {id:'waiter',name:'Двое из ларца',desc:'«Одинаковы с лица». Сами забирают готовые блюда из котлов, печей и с окошка и несут гостям.',price:1600,wage:35,lvl:4,spr:'egor_v2'},
  {id:'gusl',name:'Аука',desc:'Лесной дух-аукальщик. Тихонько вторит гуслям у стола подачи: под эхо гости теряют терпение на 30% медленнее.',price:2200,wage:40,lvl:5,spr:'egor_v4'},
  {id:'cookw',name:'Кикимора',desc:'В хорошем доме кикимора не пакостит, а помогает: сама закладывает продукты в свободные котлы, печи и сковороды под заказы гостей.',price:4500,wage:70,lvl:7,spr:'katya_v1'}];
+const RECIPES_LOC=[{id:'kisel',loc:'moroz',price:1200,lvl:1},{id:'kulesh',loc:'boloto',price:1800,lvl:1},{id:'kurnik',loc:'koshey',price:2600,lvl:1},{id:'bliny',loc:'sky',price:3200,lvl:1,need:'pan'}];
 const RECIPES=[
  {id:'glazun',price:300,lvl:2,need:'pan'},{id:'medhleb',price:450,lvl:2},{id:'omlet',price:650,lvl:3,need:'pan'},
  {id:'klyar',price:900,lvl:4,need:'pan'},{id:'shashlyk',price:1300,lvl:5,need:'pan'},{id:'zharkoe',price:1800,lvl:6}];
@@ -378,37 +397,55 @@ const ITEMS=[
  {id:'salt',name:'Мешочек соли',desc:'Первое проклятье за ночь не засчитывается.',price:90,col:'#e8e0d0'},
  {id:'mead',name:'Подкова на счастье',desc:'Щедрые гости (платят ×2,5) приходят втрое чаще.',price:80,col:'#f0a830'},
  {id:'scroll',name:'Громничная свеча',desc:'Слава за ночь ×2 — уровень трактира растёт быстрее.',price:110,col:'#e8d7a0'},
- {id:'cloth',name:'Скатерть-самобранка',desc:'Каждые 35 секунд сама кормит одного гостя за полцены.',price:160,col:'#c0392b'}];
+ {id:'cloth',name:'Скатерть-самобранка',desc:'Каждые 35 секунд сама кормит одного гостя за полцены.',price:160,col:'#c0392b'},
+ {id:'mors',loc:'moroz',name:'Морошковый морс',desc:'Готовые блюда горят втрое дольше всю ночь.',price:140,col:'#f08a3a'},
+ {id:'ogonek',loc:'boloto',name:'Болотный огонёк',desc:'Свет вокруг Егора и Катюши шире в полтора раза: темнота и морок не страшны.',price:150,col:'#9fe07a'},
+ {id:'igla',loc:'koshey',name:'Кощеева игла',desc:'Если Вий уйдёт голодным, проклятья не будет (один раз за ночь).',price:220,col:'#c9a0ff'},
+ {id:'pero',loc:'sky',name:'Перо Жар-птицы',desc:'Всю ночь на кухню падают жар-перья: подберите — получите гроши.',price:240,col:'#ffcf4a'}];
 const CHESTS=[{id:'koshey',short:'Кабак Кощея',name:'Сундук Кощея',desc:'Гроши, зелья, а если повезёт — редкий наряд или кухня.',price:250,spr:'chest_k'},
- {id:'fire',name:'Ларец Жар-птицы',desc:'Щедрее: много грошей, пачки зелий, бесплатные улучшения и редкости.',price:800,spr:'chest_f'}];
+ {id:'fire',name:'Ларец Жар-птицы',desc:'Щедрее: много грошей, пачки зелий, бесплатные улучшения и редкости.',price:800,spr:'chest_f'},
+ {id:'led',loc:'moroz',name:'Ледяной ларец',desc:'Как Сундук Кощея, только гроши и зелья вдвое щедрее.',price:450,spr:'chest_k',tint:'rgba(150,205,255,1)',base:'koshey',mul:2},
+ {id:'tina',loc:'boloto',name:'Сундук Водяного',desc:'Как Сундук Кощея, но гроши и зелья втрое щедрее.',price:650,spr:'chest_k',tint:'rgba(70,150,70,1)',base:'koshey',mul:3},
+ {id:'kosch',loc:'koshey',name:'Кощеев ларь',desc:'Как Ларец Жар-птицы, только в полтора раза щедрее.',price:1150,spr:'chest_f',tint:'rgba(150,25,25,1)',base:'fire',mul:1.5},
+ {id:'zharl',loc:'sky',name:'Сундук Жар-птицы',desc:'Как Ларец Жар-птицы, но вдвое щедрее.',price:1500,spr:'chest_f',tint:'rgba(255,200,50,1)',base:'fire',mul:2}];
 const LOCS=[
  {id:'les',short:'У трёх сосен',name:'Трактир «У трёх сосен»',desc:'Родная изба на краю Чёрного леса. Обычные правила.',price:0,lvl:1,pay:1,map:BASE_MAP,kit:null,amb:null,wall:['#1d120a','#3d2717','#4a2f1b']},
  {id:'moroz',short:'Терем Морозко',name:'Ледяной терем Морозко',desc:'Пол — сплошной лёд: ноги проскальзывают дальше. Гости — Снежка, Ледяной великан, Медведь-шатун, Серый Волк. Платят ×1,5.',price:3500,lvl:4,pay:1.5,ice:true,amb:'snow',
   map:["#m#f#k#r#|##d#h#el#","B.................S","#.##.....W.....##.#","B........|........S","#..##....|....##..#","C.................O","#C#T#b###|#QT#PO#O#"],
   kit:{floor:'floor_light',tint:'rgba(140,190,255,.32)',ctint:'rgba(200,230,255,.4)'},roster:['snow','kosh','bear','wolf','bereg','alk','snow','kosh','bear','wolf','bereg'],wall:['#1a2a3a','#4a6a8a','#5a7a9a']},
- {id:'boloto',name:'Болотная корчма Водяного',desc:'Посреди кухни трясина, морок случается вдвое чаще, болотная нечисть шалит без устали. Гости — Русалка, Земун, Кустица, Колобок. Платят ×2.',price:7000,lvl:6,pay:2,mist:true,prank:.6,amb:'flies',
+ {id:'boloto',short:'Болотная корчма',name:'Болотная корчма Водяного',desc:'Посреди кухни трясина, морок случается вдвое чаще, болотная нечисть шалит без устали. Гости — Русалка, Земун, Кустица, Колобок. Платят ×2.',price:7000,lvl:6,pay:2,mist:true,prank:.6,amb:'flies',
   map:["#m#f#k#r#|##d#h#el#","B.....~...........S","#.~~.....|..~~....#","B.....#..W..#.~~..S","#.~~.....|........#","C.....~~..........O","#C#T#b###|#QT#PO#O#"],
   kit:{floor:'floor',tint:'rgba(40,95,45,.38)',ctint:'rgba(30,85,40,.38)'},roster:['rus','soreg','kust','kolob','gam','baun','rus','soreg','kust','kolob','gam'],wall:['#142014','#2e4a2a','#3a5a32']},
- {id:'koshey',name:'Кабак Кощея',desc:'Под полом течёт лава, по кухне бродит лишняя Тень, Вий заходит каждую ночь. Гости — Чёрт, Людоед, Мара, Ледяной великан. Платят ×2,6.',price:12000,lvl:8,pay:2.6,extraShadow:1,amb:'embers',
+ {id:'koshey',short:'Кабак Кощея',name:'Кабак Кощея',desc:'Под полом течёт лава, по кухне бродит лишняя Тень, Вий заходит каждую ночь. Гости — Чёрт, Людоед, Мара, Ледяной великан. Платят ×2,6.',price:12000,lvl:8,pay:2.6,extraShadow:1,amb:'embers',
   map:["#m#f#k#r#|##d#h#el#","B.................S","#..^^....|....^^..#","B...#....W....#...S","#..^^....|....^^..#","C.................O","#C#T#b###|#QT#PO#O#"],
   kit:{floor:'floor_dark',tint:'rgba(120,30,20,.32)',ctint:'rgba(90,30,20,.45)'},roster:['chort','ogre','hel','bes','kosh','wolf','bear','chort','bes','ogre','hel'],wall:['#200a08','#4a1a12','#5a2416']},
  {id:'sky',short:'Терем Жар-птицы',name:'Небесный терем Жар-птицы',desc:'Над облаками: ветер меняет вас местами каждые 20 секунд, жар-перья падают сами. Гости — Алконост, Гамаюн, Сварожья кобылица, Берегиня. Платят ×3,2.',price:20000,lvl:10,pay:3.2,swap:[18,22],feathers:true,amb:'stars',
   map:["#m#f#k#r#|##d#h#el#","B.................S","#...oo...W...oo...#","B........|........S","#.oo.....|.....oo.#","C.................O","#C#T#b###|#QT#PO#O#"],
   kit:{floor:'floor_light',tint:'rgba(120,130,255,.26)',ctint:'rgba(235,230,255,.38)'},roster:['alk','gam','mare','bereg','snow','kolob','alk','gam','mare','bereg','snow'],wall:['#2a2240','#6a5a8a','#7a6a9a']}];
 let LOC=LOCS[0];
+STAFF.push(...STAFF_LOC);RECIPES.push(...RECIPES_LOC);
 function setLoc(id){LOC=LOCS.find(l=>l.id===id)||LOCS[0];MAP=LOC.map;rebuildMap();}
 const guestFor=d=>LOC.roster?LOC.roster[DORDER.indexOf(d)%LOC.roster.length]:DISH[d].g;
+const pc=v=>Math.round(v*100)+'%';
 const PERKS=[
- {id:'hands',name:'Ловкие руки',desc:'Рубить на доске на 25% быстрее.',cost:1},
- {id:'dash',name:'Лёгкий шаг',desc:'Рывок перезаряжается вдвое быстрее (3 с вместо 6).',cost:1},
- {id:'eye',name:'Хозяйский глаз',desc:'Готовые блюда горят на 50% дольше.',cost:1},
- {id:'charm',name:'Обаяние',desc:'Окно комбо растягивается с 12 до 18 секунд.',cost:2},
- {id:'brave',name:'Бесстрашие',desc:'Тень замечает вас на клетку ближе, а окрик Егора бьёт дальше.',cost:2},
- {id:'tale',name:'Сказительница',desc:'Улыбка Катюши возвращает гостям 40% терпения вместо 25%.',cost:2},
- {id:'luck',name:'Счастливая подкова',desc:'Щедрые гости приходят заметно чаще.',cost:2},
- {id:'thrift',name:'Бережливость',desc:'Жалованье работникам на 30% меньше.',cost:3},
- {id:'fame',name:'Молва',desc:'Слава трактира растёт на 25% быстрее.',cost:3},
- {id:'feast',name:'Хлебосольство',desc:'Каждая звезда за ночь приносит вдвое больше грошей.',cost:3}];
+ {id:'hands',name:'Ловкие руки',cost:1,v:[0,.25,.4,.6],fmt:v=>'рубить на доске на '+pc(v)+' быстрее'},
+ {id:'dash',name:'Лёгкий шаг',cost:1,v:[0,3,3.5,4],fmt:v=>'рывок перезаряжается за '+(6-v)+' с вместо 6'},
+ {id:'eye',name:'Хозяйский глаз',cost:1,v:[0,.5,.8,1.2],fmt:v=>'готовые блюда горят на '+pc(v)+' дольше'},
+ {id:'charm',name:'Обаяние',cost:2,v:[0,6,9,12],fmt:v=>'окно комбо '+(12+v)+' с вместо 12'},
+ {id:'brave',name:'Бесстрашие',cost:2,v:[0,1,1.5,2],fmt:v=>'Тень замечает вас на '+v+' кл. ближе, окрик Егора бьёт на '+v+' кл. дальше'},
+ {id:'tale',name:'Сказительница',cost:2,v:[0,.15,.25,.35],fmt:v=>'улыбка Катюши возвращает гостям '+pc(.25+v)+' терпения'},
+ {id:'luck',name:'Счастливая подкова',cost:2,v:[0,.04,.06,.09],fmt:v=>'щедрые гости приходят чаще: +'+Math.round(v*100)+' к шансу из 100'},
+ {id:'thrift',name:'Бережливость',cost:3,v:[0,.3,.4,.5],fmt:v=>'жалованье работникам на '+pc(v)+' меньше'},
+ {id:'fame',name:'Молва',cost:3,v:[0,.25,.35,.5],fmt:v=>'слава трактира растёт на '+pc(v)+' быстрее'},
+ {id:'feast',name:'Хлебосольство',cost:3,v:[0,1,1.5,2],fmt:v=>'гроши за звёзды ×'+(1+v)},
+ {id:'m_ice',loc:'moroz',where:'на любом льду',name:'Ледоход',cost:2,v:[0,.4,.7,1],fmt:v=>v>=1?'на льду больше не поскальзываетесь':'на льду поскальзываетесь на '+pc(v)+' реже'},
+ {id:'m_frost',loc:'moroz',where:'в Тереме Морозко',name:'Морозная свежесть',cost:2,v:[0,.3,.6,1],fmt:v=>'блюда горят на '+pc(v)+' дольше'},
+ {id:'b_mist',loc:'boloto',where:'в любом мороке',name:'Сквозь морок',cost:2,v:[0,.12,.24,.36],fmt:v=>'свет вокруг героев в мороке шире на '+pc(v/.6)},
+ {id:'b_calm',loc:'boloto',where:'в Болотной корчме',name:'Уговор с Водяным',cost:2,v:[0,.25,.45,.65],fmt:v=>'шалости нечисти на '+pc(v)+' реже'},
+ {id:'k_viy',loc:'koshey',where:'везде, куда приходит Вий',name:'Кощеев договор',cost:3,v:[0,.15,.3,.5],fmt:v=>'Вий ждёт на '+pc(v)+' дольше'},
+ {id:'k_lava',loc:'koshey',where:'в Кабаке Кощея',name:'Жар преисподней',cost:3,v:[0,.1,.2,.3],fmt:v=>'котлы, печи и сковороды готовят на '+pc(v)+' быстрее'},
+ {id:'s_wind',loc:'sky',where:'в Небесном тереме',name:'Попутный ветер',cost:3,v:[0,5,10,16],fmt:v=>'ветер меняет вас местами на '+v+' с реже'},
+ {id:'s_feather',loc:'sky',where:'везде',name:'Перо к перу',cost:3,v:[0,.5,1,1.5],fmt:v=>'жар-перья дают на '+pc(v)+' больше грошей'}];
 const ACH=[
  {id:'g50',name:'Хлебосол',desc:'Накормить 50 гостей',t:()=>SAVE.stats.guests>=50,c:150},
  {id:'g300',name:'Кормилец леса',desc:'Накормить 300 гостей',t:()=>SAVE.stats.guests>=300,c:500},
@@ -430,8 +467,10 @@ const ACH=[
  {id:'tales20',name:'Собиратель сказаний',desc:'Услышать 20 рассказов гостей',t:()=>SAVE.tales.length>=20,c:500},
  {id:'talesAll',name:'Книжник',desc:'Услышать все рассказы гостей',t:()=>SAVE.tales.length>=Object.values(TALES).reduce((a,l)=>a+l.length,0),c:2500},
  {id:'max',name:'Мастер на все руки',desc:'Довести любое улучшение до 5 уровня',t:()=>Object.entries(SAVE.upg).some(([k,v])=>k!=='annex'&&v>=5),c:800}];
-const perk=id=>SAVE.perks.includes(id);
-function skillPts(){return Math.max(0,tlvl()-1+SAVE.ach.length+SAVE.deduce.length-PERKS.filter(p=>perk(p.id)).reduce((a,p)=>a+p.cost,0));}
+const perkLv=id=>SAVE.perkLv[id]|0, perk=id=>perkLv(id)>0;
+const PV=id=>{const p=PERKS.find(x=>x.id===id);return p?p.v[Math.min(perkLv(id),p.v.length-1)]:0;};
+function syncPerks(){SAVE.perks=PERKS.filter(p=>perkLv(p.id)>0).map(p=>p.id);}
+function skillPts(){return Math.max(0,tlvl()-1+SAVE.ach.length+SAVE.deduce.length-PERKS.reduce((a,p)=>{const l=perkLv(p.id);return a+p.cost*l*(l+1)/2;},0));}
 function checkFacts(){const got=[];for(const f of FACTS){if(SAVE.facts.includes(f.id)||!f.t())continue;SAVE.facts.push(f.id);got.push(f);S.achQ=S.achQ||[];S.achQ.push({fact:true,name:f.name,desc:'Новая улика в «Деле деда Савватея»'});}
   if(!SAVE.epi&&SAVE.deduce.includes('d7')&&SAVE.stats.guests>=1000){SAVE.epi=true;SAVE.coins+=3000;S.achQ=S.achQ||[];S.achQ.push({fact:true,name:'Эпилог: дед вернулся!',desc:'Откройте «Дело деда» — и получите 3000 грошей'});}
   if(got.length)persist();return got;}
@@ -453,20 +492,34 @@ const known=d=>BASE_DISHES.includes(d)||SAVE.rec.includes(d);
 function recFor(kind){const out={};for(const [d,ing] of Object.entries(REC[kind]))if(known(d))out[d]=ing;return out;}
 const BASE_ING=['mush','fish','berry','root','dough','honey'];
 function crateOpen(g){if(BASE_ING.includes(g))return true;for(const k in REC)for(const [d,ing] of Object.entries(REC[k]))if(known(d)&&ing.some(x=>x===g||x===CHOP[g]))return true;return false;}
-const wages=()=>Math.round(STAFF.reduce((a,x)=>a+(staffOn(x.id)?x.wage:0),0)*(perk('thrift')?.7:1));
+const wages=()=>Math.round(STAFF.reduce((a,x)=>a+(staffOn(x.id)?x.wage:0),0)*(1-PV('thrift')));
 const buff=id=>!!(S.buffs&&S.buffs[id]);
 function payMul(){return LOC.pay*(1+.08*upg('tables'))*(1+.04*upg('annex'))*(S.theme?S.theme.pay:1)*(evOn('fair')?1.5:evOn('moon')?2:1)*DIFF[S.diff].pay;}
 const themeOn=k=>!!(S.theme&&S.theme[k]);
-const comboWin=()=>perk('charm')?18:12, comboMul=c=>1+.05*Math.min(c-1,10);
+const comboWin=()=>12+PV('charm')+2*upg('oblako'), comboMul=c=>1+.05*Math.min(c-1,10);
 const dailyReady=()=>SAVE.daily.last!==today();
-const KIT={dub:{floor:'floor',tint:null,ctint:null},gornica:{floor:'floor_light',tint:'rgba(255,230,180,.07)',ctint:'rgba(255,240,210,.14)'},izba:{floor:'floor_dark',tint:'rgba(0,0,0,.12)',ctint:'rgba(20,10,5,.4)'},boloto:{floor:'floor',tint:'rgba(40,95,45,.3)',ctint:'rgba(30,85,40,.32)'},podz:{floor:'floor_dark',tint:'rgba(70,45,100,.38)',ctint:'rgba(80,70,100,.5)'}};
+const KIT={zimn:{floor:'floor_light',tint:'rgba(150,200,255,.22)',ctint:'rgba(215,235,255,.35)'},mshan:{floor:'floor',tint:'rgba(70,120,50,.26)',ctint:'rgba(60,110,40,.3)'},chertog:{floor:'floor_dark',tint:'rgba(70,10,10,.3)',ctint:'rgba(60,10,10,.45)'},oblaka:{floor:'floor_light',tint:'rgba(200,180,255,.2)',ctint:'rgba(240,230,255,.35)'},dub:{floor:'floor',tint:null,ctint:null},gornica:{floor:'floor_light',tint:'rgba(255,230,180,.07)',ctint:'rgba(255,240,210,.14)'},izba:{floor:'floor_dark',tint:'rgba(0,0,0,.12)',ctint:'rgba(20,10,5,.4)'},boloto:{floor:'floor',tint:'rgba(40,95,45,.3)',ctint:'rgba(30,85,40,.32)'},podz:{floor:'floor_dark',tint:'rgba(70,45,100,.38)',ctint:'rgba(80,70,100,.5)'}};
 const TOOLS={prost:{pot:null,ovenBody:'#d9cfb8',ovenTrim:'#c0392b',fire:'255,150,40',board:'#c9a06a',knife:'#bfc7c9'},
  med:{pot:'#d0782c',ovenBody:'#a5523a',ovenTrim:'#e0a060',fire:'255,140,40',board:'#b0743c',knife:'#e0a060'},
  hohloma:{pot:'#c9a020',ovenBody:'#2a1210',ovenTrim:'#e8b730',fire:'255,90,30',board:'#c0392b',knife:'#e8b730'},
- koldun:{pot:'#3fbf6a',ovenBody:'#1e1a26',ovenTrim:'#8a5ad9',fire:'150,90,255',board:'#4a4458',knife:'#8a5ad9'}};
+ koldun:{pot:'#3fbf6a',ovenBody:'#1e1a26',ovenTrim:'#8a5ad9',fire:'150,90,255',board:'#4a4458',knife:'#8a5ad9'},
+ gzhel:{pot:'#3a6ad0',ovenBody:'#eef2fa',ovenTrim:'#2a50b0',fire:'120,180,255',board:'#e8eef8',knife:'#2a50b0'},
+ bronza:{pot:'#7a8a3a',ovenBody:'#3a4a2a',ovenTrim:'#b08a3a',fire:'160,220,90',board:'#5a5a32',knife:'#b08a3a'},
+ chern:{pot:'#2a2226',ovenBody:'#141012',ovenTrim:'#c0c4cc',fire:'255,60,30',board:'#2a2226',knife:'#c0c4cc'},
+ zhar:{pot:'#e86a1c',ovenBody:'#8a1d14',ovenTrim:'#ffcf4a',fire:'255,200,60',board:'#c0392b',knife:'#ffcf4a'}};
 const curKit=()=>LOC.kit||KIT[SAVE.eq.kitchen]||KIT.dub, curTools=()=>TOOLS[SAVE.eq.tools]||TOOLS.prost;
 const skinKey=i=>i===0?'egor_'+SAVE.eq.egor:'katya_'+SAVE.eq.katya;
 const tintCache={};
+const SKINS={egor_moroz:['egor_v3',205,1],egor_boloto:['egor_v3',115,.8],egor_koshey:['egor_v0',355,1.1,.62],egor_sky:['egor_v4',44,1.25,1.1],
+  katya_moroz:['katya_v0',200,.9,1.15],katya_boloto:['katya_v1',150,.9],katya_koshey:['katya_v2',0,1.2,.75],katya_sky:['katya_v4',40,1.3,1.1]};
+function recolor(key,hue,sat,lit){const im=IMG[key],c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;const x=c.getContext('2d');x.drawImage(im,0,0);
+  const d=x.getImageData(0,0,c.width,c.height),p=d.data;lit=lit||1;
+  for(let i=0;i<p.length;i+=4){if(p[i+3]<10)continue;const r=p[i]/255,g=p[i+1]/255,b=p[i+2]/255,mx=Math.max(r,g,b),mn=Math.min(r,g,b),l=(mx+mn)/2,dd=mx-mn;if(dd<.06||l<.1||l>.95)continue;
+    const s_=dd/(1-Math.abs(2*l-1));let h=mx===r?((g-b)/dd)%6:mx===g?(b-r)/dd+2:(r-g)/dd+4;h=(h*60+360)%360;if(h>=8&&h<=52)continue;
+    const S2=Math.min(1,s_*sat),L2=Math.min(.95,l*lit),C2=(1-Math.abs(2*L2-1))*S2,X=C2*(1-Math.abs((hue/60)%2-1)),m=L2-C2/2;let rr_=0,gg=0,bb=0;const k=Math.floor(hue/60)%6;
+    [[C2,X,0],[X,C2,0],[0,C2,X],[0,X,C2],[X,0,C2],[C2,0,X]][k].forEach((v,j)=>{if(j===0)rr_=v;if(j===1)gg=v;if(j===2)bb=v;});p[i]=(rr_+m)*255;p[i+1]=(gg+m)*255;p[i+2]=(bb+m)*255;}
+  x.putImageData(d,0,0);return c;}
+const skinT=setInterval(()=>{let left=0;for(const k in SKINS){if(IMG[k])continue;const [b,h,sa,li]=SKINS[k];if(ok(b)){try{IMG[k]=recolor(b,h,sa,li);}catch(e){IMG[k]=IMG[b];}}else left++;}if(!left)clearInterval(skinT);},250);
 function tinted(key,col){const id=key+col;if(tintCache[id])return tintCache[id];if(!ok(key))return null;const im=IMG[key],c=document.createElement('canvas');c.width=im.naturalWidth;c.height=im.naturalHeight;const x=c.getContext('2d');x.drawImage(im,0,0);x.globalCompositeOperation='source-atop';x.globalAlpha=.55;x.fillStyle=col;x.fillRect(0,0,c.width,c.height);tintCache[id]=c;return c;}
 const PROLOGUE=[
  {t:'Три сосны',x:'Давно это было — а может, и недавно: в Чёрном лесу время течёт по-своему. На краю леса, у трёх сосен, стоял трактир деда Савватея. Днём туда заходили люди, а ночью — те, кого люди не видят.',art:'tavern'},
@@ -529,7 +582,7 @@ const P=[
 const rnd=(a,b)=>a+Math.random()*(b-a), lerp=(a,b,t)=>a+(b-a)*Math.max(0,Math.min(1,t));
 
 function resetStations(){
-  st={};
+  st={};S.stMap=MAP;
   for(let y=0;y<ROWS;y++)for(let x=0;x<COLS;x++){
     const ch=MAP[y][x], k=x+','+y;
     if(ch==='#'||ch==='W') st[k]={kind:'counter',item:null,win:ch==='W'};
@@ -551,7 +604,7 @@ function nearestFloor(x,y){let b=null,bd=1e9;for(const [fx,fy] of floorTiles){co
 
 function baseRound(){
   Object.assign(S,{score:0,spent:0,served:0,curse:0,dark:[0,0],shadows:[],whispers:[],banner:null,paused:false,glitch:0,shake:0,scare:0,knock:0,flick:0,viyOn:false,level:1,
-    combo:0,comboT:0,xpNight:0,quests:[],buffs:{},theme:null,themeId:null,npc:null,tmpCook:false,tale:null,taleCd:10,newTales:0,npcs:[],rings:[],amb:[],skillUses:0,feather:null,featherT:-1,parts:[],saltUsed:false,clothT:-1,viyQ:[],event:null});
+    combo:0,comboT:0,xpNight:0,quests:[],buffs:{},theme:null,themeId:null,npc:null,tmpCook:false,tale:null,taleCd:10,newTales:0,npcs:[],rings:[],amb:[],skillUses:0,feather:null,featherT:-1,parts:[],saltUsed:false,iglaUsed:false,clothT:-1,viyQ:[],event:null});
   orders=[];toasts=[];resetStations();resetPlayers();
 }
 function spawnStaff(){S.npcs=[];for(const r of ['waiter','stoker','witch','gusl','cookw'])if(staffOn(r))S.npcs.push(makeNpc(r));}
@@ -559,7 +612,8 @@ function startNight(n){
   if(!S.plan||S.plan.n!==n)planNight(n);
   setLoc(SAVE.loc);S.night=n;const N=applyDiff(nightCfg(n));baseRound();
   const T=S.plan.theme?THEMES[S.plan.theme]:null;S.theme=T;S.themeId=S.plan.theme;N.dishes=S.plan.dishes.slice();
-  if(LOC.swap)N.swap=LOC.swap.slice();if(LOC.extraShadow&&N.shadows)N.shadows+=LOC.extraShadow;if(LOC.id==='koshey')N.viy=true;if(LOC.prank&&N.prank)N.prank*=LOC.prank;
+  if(LOC.swap)N.swap=LOC.swap.slice();if(LOC.extraShadow&&N.shadows)N.shadows+=LOC.extraShadow;if(LOC.id==='koshey')N.viy=true;if(LOC.prank&&N.prank)N.prank*=LOC.prank;if(N.prank)N.prank*=(LOC.id==='boloto'?1/(1-PV('b_calm')):1)*(staffOn('bolotnik')?2:1);
+  if(LOC.id==='sky'&&PV('s_wind'))N.swap=N.swap.map(v=>v+PV('s_wind'));
   if(T){if(T.spawn)N.spawn=N.spawn.map(v=>v*T.spawn);if(T.pat)N.pat=N.pat.map(v=>v*T.pat);if(T.swap)N.swap=T.swap.slice();
     if(T.quiet){N.shadows=0;N.prank=0;N.whisper=false;N.knock=false;N.scare=false;}if(T.noShadow)N.shadows=0;if(T.viy2)N.viy=true;}
   // consumables are spent automatically at the start of the night
@@ -569,7 +623,7 @@ function startNight(n){
   S.cfg=N;S.quests=S.plan.quests.map(q=>Object.assign({},q,{prog:0,done:false}));
   Object.assign(S,{scene:'play',time:N.len,spawnT:1.5,prankT:N.prank?N.prank*(staffOn('witch')?1.5:1):1e9,swapT:rnd(N.swap[0],N.swap[1]),
     scareAt:N.scare?rnd(.35,.8)*N.len:-1,whT:rnd(10,18),knockT:rnd(18,30),shadowT:N.shadows?14+(buff('amulet')?60:0):-1,flickT:rnd(8,16),hbT:0,
-    evT:T&&T.events?rnd(6,10):LOC.mist?rnd(14,20):rnd(26,38),featherT:(T&&T.feathers)||LOC.feathers?6:-1,clothT:buff('cloth')?35:-1,
+    evT:T&&T.events?rnd(6,10):LOC.mist?rnd(14,20):rnd(26,38),featherT:(T&&T.feathers)||LOC.feathers||buff('pero')?6:-1,clothT:buff('cloth')?35:-1,
     viyQ:N.viy?(T&&T.viy2?[.32,.7]:[.55]):[]});
   spawnStaff();
   setBanner((n<3?['Ночь первая','Ночь вторая','Ночь третья'][n]:'Ночь '+(n+1))+(T?'. '+T.name:'. '+LOC.name),T?T.col:null);
@@ -649,6 +703,20 @@ const MUSIC=[
  {id:'metel',slot:'night',name:'Метелица',inst:'bala',st:'play',bpm:120,price:1000,desc:'Быстрый минорный наигрыш на балалайке — кружит, как вьюга.'},
  {id:'zhar',slot:'night',name:'Жар-птица',inst:'harp',st:'play',bpm:126,price:1400,desc:'Звонкий светлый напев на гуслях, от которого руки сами двигаются быстрее.'},
  {id:'plyaska',slot:'night',name:'Кощеева пляска',inst:'organ',st:'play',bpm:114,price:2000,desc:'Мрачная пляска на органе из Кощеева замка. Для смелых поваров.'}];
+MUSIC.push(
+ {id:'zimushka',loc:'moroz',slot:'night',name:'Зимушка',inst:'bell',st:'play',bpm:108,price:1200,desc:'Звонкий морозный наигрыш на колокольцах.'},
+ {id:'tuman',loc:'boloto',slot:'menu',name:'Болотный туман',inst:'reed',st:'title',bpm:58,price:1500,desc:'Тягучая жалейка над трясиной.'},
+ {id:'chertog',loc:'koshey',slot:'menu',name:'Кощеев чертог',inst:'organ',st:'title',bpm:62,price:2000,desc:'Тяжёлый орган из подземного дворца.'},
+ {id:'vysota',loc:'sky',slot:'night',name:'Над облаками',inst:'harp',st:'play',bpm:122,price:2600,desc:'Светлые гусли, от которых ночь летит быстрее.'});
+Object.assign(TRK,{
+ zimushka:{m:[[[0,2],[3,2],[7,2],[3,2]],[[5,2],[8,2],[7,4]],[[3,2],[5,2],[7,2],[10,2]],[[8,4],[7,4]],[[12,2],[10,2],[8,2],[7,2]],[[5,2],[7,2],[3,4]],[[2,2],[3,2],[5,2],[-1,2]],[[0,8]]],
+   ch:[[0,'m'],[5,'m'],[0,'m'],[5,'m'],[8,'M'],[3,'M'],[7,'M'],[0,'m']]},
+ tuman:{m:[[[0,4],[2,2],[3,2]],[[5,6],[3,2]],[[2,4],[0,2],[-2,2]],[[0,8]],[[3,4],[5,2],[7,2]],[[8,4],[7,2],[5,2]],[[3,2],[2,2],[0,2],[-1,2]],[[0,8]]],
+   ch:[[0,'m'],[5,'m'],[-2,'M'],[0,'m'],[3,'M'],[5,'m'],[-5,'M'],[0,'m']]},
+ chertog:{m:[[[0,4],[1,4]],[[3,2],[1,2],[0,4]],[[-2,4],[0,2],[1,2]],[[0,8]],[[7,4],[8,4]],[[10,2],[8,2],[7,4]],[[5,2],[3,2],[1,2],[3,2]],[[0,8]]],
+   ch:[[0,'m'],[1,'M'],[-2,'m'],[0,'m'],[0,'m'],[-4,'M'],[1,'M'],[0,'m']]},
+ vysota:{m:[[[7,1],[9,1],[11,1],[12,1],[14,2],[12,2]],[[11,1],[9,1],[7,1],[9,1],[11,4]],[[12,1],[11,1],[9,1],[7,1],[5,2],[4,2]],[[2,1],[4,1],[5,1],[7,1],[4,4]],[[9,2],[12,2],[16,2],[14,2]],[[12,1],[14,1],[12,1],[11,1],[9,4]],[[7,1],[9,1],[11,1],[9,1],[7,2],[4,2]],[[0,2],[4,2],[7,4]]],
+   ch:[[0,'M'],[7,'M'],[5,'M'],[2,'m'],[5,'M'],[2,'m'],[7,'M'],[0,'M']]}});
 const MUSID=id=>MUSIC.find(m=>m.id===id)||MUSIC[0];
 for(const k in TRK){TRK[k].maps=TRK[k].m.map(bar=>{const map={};let p=0;for(const [n,d] of bar){if(n!==null)map[p]=[n,d];p+=d;}return map;});}
 let mus={next:0,step:0,timer:null,trk:'title'};
@@ -770,15 +838,15 @@ function serveOrder(i,who,opt){
   return pay;
 }
 // ---------- waiter ----------
-const ROLES={waiter:{name:'Двое из ларца',spr:'h_waiter',col:'#ffb0a0',acc:'twins'},stoker:{name:'Овинник',spr:'h_stoker',col:'#ff8a5a',acc:'eyes'},witch:{name:'Домовой',spr:'h_witch',col:'#ffe08a',acc:'beard'},
+const ROLES={studen:{name:'Студенец',spr:'h_witch',tint:'rgba(140,200,255,1)',col:'#9fd0f0'},bolotnik:{name:'Болотник',spr:'h_gusl',tint:'rgba(50,120,50,1)',col:'#8fd18f'},ognevik:{name:'Огневик',spr:'h_stoker',tint:'rgba(255,80,20,1)',col:'#ff8a5a'},vihor:{name:'Вихорь',spr:'h_cookw',tint:'rgba(235,235,255,1)',col:'#e8e4f0'},waiter:{name:'Двое из ларца',spr:'h_waiter',col:'#ffb0a0',acc:'twins'},stoker:{name:'Овинник',spr:'h_stoker',col:'#ff8a5a',acc:'eyes'},witch:{name:'Домовой',spr:'h_witch',col:'#ffe08a',acc:'beard'},
  gusl:{name:'Аука',spr:'h_gusl',col:'#a8e08a',acc:'leaves'},cookw:{name:'Кикимора',spr:'h_cookw',col:'#9fc8a8',acc:'kiki'},cook:{name:'Жихарь',spr:'h_cook',col:'#e8c890',acc:'zhihar'}};
 function drawWorker(role,x,yb,size,fx,fy,moving,t){
-  const R_=ROLES[role];if(!ok(R_.spr))return;
+  const R_=ROLES[role];if(!R_||!ok(R_.spr))return;
   if(R_.acc==='twins'){drawWorker1(role,x-size*.2,yb,size*.82,fx,fy,moving,t,0);drawWorker1(role,x+size*.2,yb,size*.82,fx,fy,moving,t+.17,1);return;}
   drawWorker1(role,x,yb,R_.acc==='zhihar'?size*.8:size,fx,fy,moving,t,0);
 }
 function drawWorker1(role,x,yb,size,fx,fy,moving,t,k){
-  const R_=ROLES[role],im=IMG[R_.spr];
+  const R_=ROLES[role],im=R_.tint?(tinted(R_.spr,R_.tint)||IMG[R_.spr]):IMG[R_.spr];
   const row=fy===-1?1:fx!==0?2:0,fr=moving?Math.floor(t*9)%6:0,s_=size/32,flip=fx<0&&row===2,back=row===1;
   ctx.save();ctx.translate(Math.round(x),Math.round(yb));if(flip)ctx.scale(-1,1);
   ctx.drawImage(im,fr*32,row*32,32,32,-16*s_,-30*s_,32*s_,32*s_);
@@ -858,16 +926,16 @@ function toastAt(n,t,col){toasts.push({x:n.px*TILE+TILE/2,y:MAPY+n.py*TILE,t,col
 // ---------- hero abilities ----------
 const AB=[{dash:'KeyQ',skill:'KeyE',skillName:'окрик',cd:22},{dash:'KeyJ',skill:'KeyO',skillName:'улыбка',cd:28}];
 function doDash(p){if(p.dashCd>0||p.moving)return;let n=0;while(n<3&&walk(p.x+p.fx*(n+1),p.y+p.fy*(n+1)))n++;if(!n)return;
-  p.ox=p.x;p.oy=p.y;p.x+=p.fx*n;p.y+=p.fy*n;p.moving=true;p.mt=0;p.dashN=n;p.slid=true;p.touchCool=Math.max(p.touchCool,.7);p.dashCd=perk('dash')?3:6;
+  p.ox=p.x;p.oy=p.y;p.x+=p.fx*n;p.y+=p.fy*n;p.moving=true;p.mt=0;p.dashN=n;p.slid=true;p.touchCool=Math.max(p.touchCool,.7);p.dashCd=6-PV('dash');
   for(let i=0;i<8;i++)S.parts.push({x:p.px*TILE+TILE/2,y:MAPY+p.py*TILE+TILE/2,vx:-p.fx*rnd(40,120),vy:rnd(-40,10),life:.4,dust:true});
   noise(.25,.06,1500,1);if(S.scene==='play'){S.skillUses++;qProg('skill',1);}}
 function doSkill(i){const p=P[i],a=AB[i];if(p.skillCd>0){toast(p,a.skillName+' — ещё '+Math.ceil(p.skillCd)+' с',C.muted);return;}
-  if(i===0){const r=perk('brave')?4:3;let k=0;for(const sh of S.shadows){if(sh.state==='gone')continue;if(Math.hypot(sh.px-p.px,sh.py-p.py)<=r){banish(sh,0,0,'#ffe08a');k++;}}
+  if(i===0){const r=3+PV('brave');let k=0;for(const sh of S.shadows){if(sh.state==='gone')continue;if(Math.hypot(sh.px-p.px,sh.py-p.py)<=r){banish(sh,0,0,'#ffe08a');k++;}}
     S.rings.push({x:p.px*TILE+TILE/2,y:MAPY+p.py*TILE+TILE/2,t:0,dur:.7,r:r*TILE,col:'#ffe08a'});beep(180,.25,'sawtooth',.06,90);
-    if(k){toast(p,'Окрик! Тень прогнана',C.gold2);p.skillCd=a.cd;}else{toast(p,'Рядом Теней нет',C.muted);p.skillCd=4;return;}}
-  else{if(!orders.length){toast(p,'Гостей пока нет',C.muted);return;}const add=perk('tale')?.4:.25;for(const o of orders)if(o.t!==Infinity)o.t=Math.min(o.max,o.t+o.max*add);
+    if(k){toast(p,'Окрик! Тень прогнана',C.gold2);p.skillCd=a.cd*(1-.08*upg('ledn'));}else{toast(p,'Рядом Теней нет',C.muted);p.skillCd=4;return;}}
+  else{if(!orders.length){toast(p,'Гостей пока нет',C.muted);return;}const add=.25+PV('tale');for(const o of orders)if(o.t!==Infinity)o.t=Math.min(o.max,o.t+o.max*add);
     for(let k=0;k<10;k++)S.parts.push({x:p.px*TILE+TILE/2,y:MAPY+p.py*TILE,vx:rnd(-60,60),vy:rnd(-140,-60),life:1,heart:true});
-    S.rings.push({x:p.px*TILE+TILE/2,y:MAPY+p.py*TILE+TILE/2,t:0,dur:.7,r:140,col:'#f39a8c'});toast(p,'Улыбка! Гости повеселели',P[1].tag);beep(880,.15,'sine',.06);setTimeout(()=>beep(1175,.2,'sine',.06),120);p.skillCd=a.cd;}
+    S.rings.push({x:p.px*TILE+TILE/2,y:MAPY+p.py*TILE+TILE/2,t:0,dur:.7,r:140,col:'#f39a8c'});toast(p,'Улыбка! Гости повеселели',P[1].tag);beep(880,.15,'sine',.06);setTimeout(()=>beep(1175,.2,'sine',.06),120);p.skillCd=a.cd*(1-.08*upg('ledn'));}
   if(S.scene==='play'){S.skillUses++;qProg('skill',1);}}
 
 function doSwap(){
@@ -894,26 +962,26 @@ function moveShadow(sh,dt){
   if(sh.state==='gone'){if(sh.t<=0){const [x,y]=farTile();Object.assign(sh,{x,y,px:x,py:y,ox:x,oy:y,mt:1,state:'appear',t:1.6});noise(.6,.04,400,3);}return;}
   if(sh.state==='appear'){if(sh.t<=0){sh.state='wander';sh.cd=1.5;}return;}
   if(sh.state==='notice'){if(sh.t<=0){sh.state='hunt';sh.t=D.hunt+S.level*.4;}return;}
-  const sp=sh.speed*(S.viyOn?1.25:1)*(evOn('moon')?1.2:1)*(buff('amulet')?.8:1)*(sh.state==='hunt'?1.15+S.level*.08:.55);
+  const sp=sh.speed*(1-.06*upg('most'))*(S.viyOn?1.25:1)*(evOn('moon')?1.2:1)*(buff('amulet')?.8:1)*(sh.state==='hunt'?1.15+S.level*.08:.55);
   if(sh.mt<1){sh.mt+=dt*sp;const k=Math.min(1,sh.mt);sh.px=sh.ox+(sh.x-sh.ox)*k;sh.py=sh.oy+(sh.y-sh.oy)*k;return;}
   if(sh.state==='hunt'){
     if(sh.t<=0||!sh.prey.hold){sh.state='wander';sh.cd=3;sh.prey=null;}
     else{stepShadow(sh,sh.prey);return;}
   }
   if(sh.cd<=0){
-    const prey=P.filter(p=>p.hold&&p.touchCool<=0&&Math.abs(p.x-sh.x)+Math.abs(p.y-sh.y)<=D.notice-(perk('brave')?1:0)).sort((a,b)=>(Math.abs(a.x-sh.x)+Math.abs(a.y-sh.y))-(Math.abs(b.x-sh.x)+Math.abs(b.y-sh.y)))[0];
+    const prey=P.filter(p=>p.hold&&p.touchCool<=0&&Math.abs(p.x-sh.x)+Math.abs(p.y-sh.y)<=D.notice-PV('brave')).sort((a,b)=>(Math.abs(a.x-sh.x)+Math.abs(a.y-sh.y))-(Math.abs(b.x-sh.x)+Math.abs(b.y-sh.y)))[0];
     if(prey){sh.state='notice';sh.t=.8;sh.prey=prey;noise(.5,.05,1800,4);beep(220,.4,'sawtooth',.03,110);return;}
   }
   stepShadow(sh,null);
 }
-function burnTime(){return DIFF[S.diff].burn*(1+.4*upg('iron'))*(perk('eye')?1.5:1)*(staffOn('stoker')?2.5:1);}
+function burnTime(){return DIFF[S.diff].burn*(1+.4*upg('iron'))*(1+PV('eye'))*(staffOn('stoker')?2.5:1)*(LOC.id==='moroz'?1+PV('m_frost'):1)*(staffOn('studen')?1.6:1)*(buff('mors')?3:1);}
 const WHISPERS=['оно уже внутри','не смотри в окошко','это не Катюша','это не Егор','дед здесь','мы голодны','ты следующий','не оборачивайся','три','поднимите мне веки'];
 
 function updateCore(dt,tut){
   for(const p of P){
     p.inv=Math.max(0,p.inv-dt);p.chill=Math.max(0,p.chill-dt);p.touchCool=Math.max(0,p.touchCool-dt);
-    if(p.moving){p.mt+=p.dashN?dt*22/p.dashN:dt*(p.chill>0?4.5:7.5)*(1+.08*upg('boots'));p.walk+=dt*9;if(p.mt>=1){p.moving=false;p.px=p.x;p.py=p.y;p.dashN=0;
-        if((themeOn('ice')||LOC.ice)&&!p.slid&&p.lastD){const nx=p.x+p.lastD[0],ny=p.y+p.lastD[1];p.slid=true;if(walk(nx,ny)&&Math.random()<.65){p.ox=p.x;p.oy=p.y;p.x=nx;p.y=ny;p.moving=true;p.mt=0;}}}
+    if(p.moving){p.mt+=p.dashN?dt*22/p.dashN:dt*(p.chill>0?4.5:7.5)*(1+.08*upg('boots'))*(staffOn('vihor')?1.1:1);p.walk+=dt*9;if(p.mt>=1){p.moving=false;p.px=p.x;p.py=p.y;p.dashN=0;
+        if((themeOn('ice')||LOC.ice)&&!p.slid&&p.lastD){const nx=p.x+p.lastD[0],ny=p.y+p.lastD[1];p.slid=true;if(walk(nx,ny)&&Math.random()<.65*(1-PV('m_ice'))){p.ox=p.x;p.oy=p.y;p.x=nx;p.y=ny;p.moving=true;p.mt=0;}}}
       else{p.px=p.ox+(p.x-p.ox)*p.mt;p.py=p.oy+(p.y-p.oy)*p.mt;}}
     if(!p.moving){
       const k=p.ctrl;let d=null;
@@ -925,7 +993,7 @@ function updateCore(dt,tut){
     p.working=!!keys[p.ctrl.work]&&!p.moving;
     const s=target(p);
     if(p.working&&s&&s.kind==='board'&&s.item&&CHOP[s.item]){
-      const before=s.prog;s.prog+=dt/1.3*(1+.25*upg('knife'))*(perk('hands')?1.25:1);if(Math.floor(s.prog*6)!==Math.floor(before*6))sfx.chop();
+      const before=s.prog;s.prog+=dt/1.3*(1+.25*upg('knife'))*(1+PV('hands'));if(Math.floor(s.prog*6)!==Math.floor(before*6))sfx.chop();
       if(s.prog>=1){s.item=CHOP[s.item];s.prog=0;sfx.done();}
     }
   }
@@ -936,7 +1004,7 @@ function updateCore(dt,tut){
     const helped=P.some(p=>p.working&&target(p)===s);
     const fanned=!tut&&S.npcs.some(n=>n.role==='stoker'&&n.fan===k&&!n.moving);if(fanned)s.fanT=(s.fanT||0)+dt;
     const sp=(s.kind==='pot'?1+.2*upg('pot'):s.kind==='oven'?1+.2*upg('oven'):1+.1*(upg('pot')+upg('oven')))*(fanned?1.7:1);
-    if(s.state==='cook'){s.t+=dt*(helped?2:1)*(evOn('domovoy')?2:1)*sp/COOKT[s.kind];if(s.t>=1){s.state='done';s.burn=0;sfx.done();}}
+    if(s.state==='cook'){s.t+=dt*(helped?2:1)*(evOn('domovoy')?2:1)*sp*(LOC.id==='koshey'?1+PV('k_lava'):1)*(staffOn('ognevik')?1.15:1)/COOKT[s.kind];if(s.t>=1){s.state='done';s.burn=0;sfx.done();}}
     else if(s.state==='done'&&!tut){s.burn+=dt;if(s.burn>burnTime()){s.state='burn';s.product='coal';sfx.bad();}}
   }
   if(!tut)for(const n of S.npcs)updateNpc(n,dt);
@@ -979,16 +1047,17 @@ function update(dt){
   const cap=Math.min(DIFF[S.diff].cap,prog>.5?4:3);
   if(S.spawnT<=0&&orders.filter(o=>!o.boss).length<cap&&orders.length<4&&S.time>8){
     const d=N.dishes[Math.floor(Math.random()*N.dishes.length)],pat=lerp(N.pat[0],N.pat[1],prog);
-    const gold=Math.random()<(.05+.01*upg('sign')+(perk('luck')?.04:0))*(buff('mead')?3:1);
+    const gold=Math.random()<(.05+.01*upg('sign')+PV('luck'))*(buff('mead')?3:1);
     orders.push({dish:d,g:guestFor(d),t:pat,max:pat,gold});if(gold)beep(1318,.15,'sine',.05);
     S.spawnT=lerp(N.spawn[0],N.spawn[1],prog)*rnd(.85,1.15);beep(520,.12,'sine',.05);
   }
   if(S.viyQ.length&&prog>S.viyQ[0]&&orders.length<4){
     S.viyQ.shift();S.viyOn=true;const d=N.dishes[Math.floor(Math.random()*N.dishes.length)];
-    const vp=DIFF[S.diff].viyPat;orders.push({dish:d,g:'viy',t:vp,max:vp,boss:true});setBanner('Вий вошёл в трактир. Не смотрите ему в глаза',C.cin);sfx.scream();S.shake=.6;
+    const vp=DIFF[S.diff].viyPat*(1+PV('k_viy'));orders.push({dish:d,g:'viy',t:vp,max:vp,boss:true});setBanner('Вий вошёл в трактир. Не смотрите ему в глаза',C.cin);sfx.scream();S.shake=.6;
   }
   for(const o of orders)o.t-=dt*(evOn('moon')?1.6:1)*(staffOn('gusl')?.7:1);
   for(const o of orders.filter(o=>o.t<=0)){
+    if(o.boss&&buff('igla')&&!S.iglaUsed){S.iglaUsed=true;S.viyOn=false;setBanner('Вий ушёл голодным, но Кощеева игла отвела проклятье','#c9a0ff');sfx.bad();continue;}
     if(buff('salt')&&!S.saltUsed&&!o.boss){S.saltUsed=true;setBanner(GNAME[o.g]+' ушёл, но соль уберегла от проклятья','#e8e0d0');sfx.bad();continue;}
     S.curse+=o.boss?DIFF[S.diff].viyCurse:1;S.combo=0;S.comboT=0;if(o.boss)S.viyOn=false;setBanner(GNAME[o.g]+' ушёл голодным. Проклятье!',C.cin);sfx.curse();S.shake=.5;S.glitch=.3;}
   orders=orders.filter(o=>o.t>0);
@@ -1007,7 +1076,7 @@ function update(dt){
   if(S.scareAt>0&&S.time>6&&N.len-S.time>=S.scareAt){S.scareAt=-1;if(scareBox.checked){S.scare=.7;sfx.scream();}else{S.glitch=.5;sfx.whisper();}}
   if(S.curse>=2){S.hbT-=dt;if(S.hbT<=0){S.hbT=.85;sfx.heart();}}
   // feathers, cloth, special events
-  if(S.feather){S.feather.life-=dt;if(S.feather.life<=0)S.feather=null;else for(const p of P)if(p.x===S.feather.x&&p.y===S.feather.y){const v=Math.round(15*payMul()/(S.theme?S.theme.pay:1));S.score+=v;toast(p,'Жар-перо! +'+v,EVENTS.feather.col);sfx.serve();S.feather=null;if(evOn('feather'))S.event.t=0;break;}}
+  if(S.feather){S.feather.life-=dt;if(S.feather.life<=0)S.feather=null;else for(const p of P)if(p.x===S.feather.x&&p.y===S.feather.y){const v=Math.round(15*payMul()/(S.theme?S.theme.pay:1)*(1+PV('s_feather')));S.score+=v;toast(p,'Жар-перо! +'+v,EVENTS.feather.col);sfx.serve();S.feather=null;if(evOn('feather'))S.event.t=0;break;}}
   if(S.featherT>0){S.featherT-=dt;if(S.featherT<=0){S.featherT=13;if(!S.feather&&S.time>8){const [x,y]=farTile();S.feather={x,y,life:11};beep(880,.1,'sine',.05);}}}
   if(S.clothT>0){S.clothT-=dt;if(S.clothT<=0){S.clothT=35;const i=orders.findIndex(o=>!o.boss);if(i>=0){const sv=orders[i];serveOrder(i,{px:17,py:2},{half:true});setBanner('Скатерть-самобранка накормила: '+GNAME[sv.g],'#e8b0a0');}}}
   if(S.event){S.event.t-=dt;
@@ -1027,10 +1096,10 @@ function endNight(){
   const L0=tlvl(),qSum=S.quests.filter(q=>q.done).reduce((a,q)=>a+q.reward,0);
   const prevStreak=SAVE.streak;SAVE.streak=ok?SAVE.streak+1:0;
   const sMul=ok?1+.03*Math.min(SAVE.streak-1,10):1;
-  const dishes=failed?Math.floor(S.score*.3):S.score,starB=Math.round(stars*12*(1+.1*(L0-1))*LOC.pay*(perk('feast')?2:1));
+  const dishes=failed?Math.floor(S.score*.3):S.score,starB=Math.round(stars*12*(1+.1*(L0-1))*LOC.pay*(1+PV('feast')));
   const gross=Math.round((dishes+starB+qSum)*sMul),w=ok?wages():Math.round(wages()/2),net=gross-S.spent-w;
-  SAVE.coins=Math.max(0,SAVE.coins+net);
-  const xp=Math.round((S.xpNight*(buff('scroll')?2:1)+stars*30+S.quests.filter(q=>q.done).length*20)*(1+.04*upg('annex'))*(perk('fame')?1.25:1));
+  SAVE.coins=Math.max(0,SAVE.coins+net);const kazna=upg('kazna')?Math.min(150*upg('kazna'),Math.round(SAVE.coins*.01*upg('kazna'))):0;SAVE.coins+=kazna;
+  const xp=Math.round((S.xpNight*(buff('scroll')?2:1)+stars*30+S.quests.filter(q=>q.done).length*20)*(1+.04*upg('annex'))*(1+PV('fame')));
   SAVE.xp+=xp;const L1=tlvl();const ups=[];
   for(let l=L0+1;l<=L1;l++){const c=60*l;SAVE.coins+=c;SAVE.free.koshey++;ups.push(l);}
   const unlocks=[];for(const l of ups){for(const u of UPG)if(u.lvl===l)unlocks.push(u.name);for(const x of STAFF)if(x.lvl===l)unlocks.push(x.name);for(const r of RECIPES)if(r.lvl===l)unlocks.push('рецепт «'+DISH[r.id].name+'»');for(const x of LOCS)if(x.lvl===l&&x.price)unlocks.push(x.name);}
@@ -1039,7 +1108,7 @@ function endNight(){
   const st_=SAVE.stats;st_.nights++;st_.guests+=S.served;st_.earned+=Math.max(0,net);const rec=net>st_.bestRev&&st_.nights>1;st_.bestRev=Math.max(st_.bestRev,net);
   if(ok){SAVE.night=Math.max(SAVE.night,S.night+1);st_.bestNight=Math.max(st_.bestNight,S.night+1);}
   persist();checkAch();S.newFacts=checkFacts();if(typeof fillReplay==='function')fillReplay();
-  S.result={stars,failed,ok,score:S.score,served:S.served,dishes,starB,qSum,sMul,streak:SAVE.streak,prevStreak,spent:S.spent,wages:w,net,xp,ups,unlocks,bonusChest,rec,lvl:L1};
+  S.result={kazna,stars,failed,ok,score:S.score,served:S.served,dishes,starB,qSum,sMul,streak:SAVE.streak,prevStreak,spent:S.spent,wages:w,net,xp,ups,unlocks,bonusChest,rec,lvl:L1};
   S.scene='nightEnd';setDrone(0);
   if(ok){sfx.serve();if(ups.length)setTimeout(()=>{[523,659,784,1046].forEach((f,i)=>setTimeout(()=>beep(f,.25,'sine',.07),i*120));},500);}else sfx.curse();
 }
@@ -1173,6 +1242,7 @@ resetBtn.addEventListener('click',()=>{resetAsk.hidden=false;resetBtn.hidden=tru
 document.getElementById('resetNo').addEventListener('click',()=>{resetAsk.hidden=true;resetBtn.hidden=false;say('Прогресс сохранён.');});
 document.getElementById('resetYes').addEventListener('click',()=>{try{localStorage.removeItem(slotKey(SLOT));localStorage.removeItem('kuhnya-best');}catch(e){}say('Прогресс стёрт. Начинаем заново…');setTimeout(()=>location.reload(),300);});
 pauseBtn.addEventListener('click',()=>{initAudio();togglePause();cv.focus();});
+cv.addEventListener('wheel',e=>{if(S.scene!=='shop'||S.reader||caseCat()||talesCat())return;const n=catItems(CATS[S.shopCat].key).length;if(n<=SG.cols*2)return;e.preventDefault();S.shopSel=Math.max(0,Math.min(n-1,S.shopSel+(e.deltaY>0?SG.cols:-SG.cols)));},{passive:false});
 cv.addEventListener('click',e=>{cv.focus();initAudio();
   if(S.chestAnim){if(S.chestAnim.t>3.4)S.chestAnim=null;return;}
   if(S.scene==='lobby')return;
@@ -1218,6 +1288,7 @@ function ell(x,y,rx,ry,c){ctx.fillStyle=c;ctx.beginPath();ctx.ellipse(x,y,rx,ry,
 function rr(x,y,w,h,r,c){ctx.fillStyle=c;ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill();}
 const ICON={mush_c:1,pohl:1,ukha:1,zapech:1,pirog:1,berry:1,root:1,fish:1,honey:1,sbiten:1,egg:1,milk:1,meat:1,glazun:1,omlet:1,zharkoe:1,shashlyk:1,medhleb:1,klyar:1};
 function drawItem(t,x,y,s=1){
+  if(DICON[t]){const im=tinted(DICON[t][0],DICON[t][1]);if(im){const z=34*s;ctx.drawImage(im,Math.round(x-z/2),Math.round(y-z/2),z,z);return;}}
   if(ICON[t]&&ok(t)){const z=34*s;ctx.drawImage(IMG[t],Math.round(x-z/2),Math.round(y-z/2),z,z);return;}
   ctx.save();ctx.translate(x,y);ctx.scale(s,s);
   switch(t){
@@ -1231,7 +1302,7 @@ function drawItem(t,x,y,s=1){
   ctx.restore();
 }
 const CHARM={patience:'ritual_cup',amulet:'motanka_doll',salt:'herb_sachet',mead:'ritual_horseshoe',scroll:'thunder_candle',cloth:'embroidered_rushnyk'};
-const PERK_ICON={hands:'wooden_spindle',dash:'fern_flower',eye:'thunder_candle',charm:'flower_wreath',brave:'household_idol',tale:'pysanka_egg',luck:'ritual_horseshoe',thrift:'herb_sachet',fame:'flower_wreath',feast:'embroidered_rushnyk'};
+const PERK_ICON={m_ice:'warding_bell',m_frost:'ritual_cup',b_mist:'thunder_candle',b_calm:'motanka_doll',k_viy:'household_idol',k_lava:'herb_sachet',s_wind:'fern_flower',s_feather:'pysanka_egg',hands:'wooden_spindle',dash:'fern_flower',eye:'thunder_candle',charm:'flower_wreath',brave:'household_idol',tale:'pysanka_egg',luck:'ritual_horseshoe',thrift:'herb_sachet',fame:'flower_wreath',feast:'embroidered_rushnyk'};
 function drawPotion(id,x,y,s=1){const ck='ch_'+CHARM[id];if(ok(ck)){const z=Math.round(40*s);ctx.drawImage(IMG[ck],Math.round(x-z/2),Math.round(y-z/2),z,z);return;}const it=ITEMS.find(i=>i.id===id);ctx.save();ctx.translate(x,y);ctx.scale(s,s);
   if(id==='scroll'){rr(-14,-10,28,20,3,'#e8d7a0');rr(-17,-12,6,24,3,'#c9a96a');rr(11,-12,6,24,3,'#c9a96a');ctx.fillStyle='#8a6a40';for(let i=0;i<3;i++)ctx.fillRect(-8,-5+i*5,16,1.5);}
   else if(id==='salt'){ell(0,4,13,11,'#d9c9a0');rr(-6,-12,12,8,3,'#c9b98a');ctx.fillStyle='#8a1d14';ctx.fillRect(-7,-6,14,3);ell(0,6,6,4,'#fff');}
@@ -1265,6 +1336,7 @@ function drawTile(x,y){
   if(ch==='|'){const Wc=LOC.wall;ctx.fillStyle=Wc[0];ctx.fillRect(px,py,TILE,TILE);for(let i=0;i<4;i++)rr(px+3,py+3+i*13,TILE-6,11,5,i%2?Wc[1]:Wc[2]);
     if((y===2||y===4)&&ok('torch'))ctx.drawImage(IMG.torch,(Math.floor(S.blink*10+y)%6)*32,0,32,32,px+8,py+2,40,40);return;}
   counterTop(px,py);
+  if(!s)return;
   if(ch==='W'){ctx.fillStyle='#0d0805';ctx.fillRect(px,py,TILE,TILE);rr(px+3,py+6,TILE-6,TILE-10,3,'#5a3a20');ctx.strokeStyle=C.gold;ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(px+4,py+TILE-4);ctx.lineTo(px+4,py+18);ctx.quadraticCurveTo(cx,py-4,px+TILE-4,py+18);ctx.lineTo(px+TILE-4,py+TILE-4);ctx.stroke();
     if(S.knock>0){const a=Math.min(1,S.knock)*.9;ctx.save();ctx.globalAlpha=a;const yy=py+10+Math.sin(S.blink*20)*2;ctx.fillStyle='#cfd8cf';rr(cx-9,yy,18,22,6,'#cfd8cf');for(let i=0;i<4;i++)rr(cx-9+i*5,yy-10,4,13,2,'#cfd8cf');ctx.fillStyle='#6b1a14';for(let i=0;i<4;i++)ctx.fillRect(cx-9+i*5,yy-10,4,3);ctx.restore();}
     ctx.fillStyle=C.gold;ctx.font='10px '+FB;ctx.textAlign='center';ctx.fillText('окошко',cx,py+TILE-2);}
@@ -1432,7 +1504,7 @@ function drawLight(){
   lx.fillStyle='rgba(4,2,2,'+Math.min(.97,base)+')';lx.fillRect(0,MAPY,W,MAPH);
   lx.globalCompositeOperation='destination-out';
   const hole=(x,y,r,a)=>{const g=lx.createRadialGradient(x,y,r*.15,x,y,r);g.addColorStop(0,'rgba(0,0,0,'+a+')');g.addColorStop(1,'rgba(0,0,0,0)');lx.fillStyle=g;lx.fillRect(x-r,y-r,r*2,r*2);};
-  for(const p of P){const side=p.x<9?0:1,r=((S.dark[side]>0?55:175-S.level*15)*(evOn('mist')?.6:1))+Math.sin(S.blink*9+side)*5;hole(p.px*TILE+TILE/2,MAPY+p.py*TILE+TILE/2-8,r,1);}
+  for(const p of P){const side=p.x<9?0:1,r=((S.dark[side]>0?55:175-S.level*15)*(evOn('mist')?.6+PV('b_mist'):1)*(buff('ogonek')?1.5:1))+Math.sin(S.blink*9+side)*5;hole(p.px*TILE+TILE/2,MAPY+p.py*TILE+TILE/2-8,r,1);}
   for(const n of S.npcs)hole(n.px*TILE+TILE/2,MAPY+n.py*TILE+TILE/2-8,n.role==='witch'?130:90,.8);
   if(S.feather)hole(S.feather.x*TILE+TILE/2,MAPY+S.feather.y*TILE+TILE/2,60,.9);
   for(const k in st){const s=st[k];if(isCooker(s)&&(s.state==='cook'||s.state==='done')){const [x,y]=k.split(',').map(Number);hole(x*TILE+TILE/2,MAPY+y*TILE+TILE/2,85,.85);}
@@ -1492,8 +1564,8 @@ function drawTavern(cx,by,l,ann,sc){
   ctx.restore();
 }
 function xpBar(x,y,w){const L=lvlInfo();rr(x,y,w,8,4,'#2a1f18');rr(x,y,Math.max(8,w*L.x/L.need),8,4,'#d9a441');}
-function anyAffordable(){if(UPG.some(u=>{const l=upg(u.id),max=u.cost==='inf'?1e9:u.cost.length;return l<max&&(!u.lvl||tlvl()>=u.lvl)&&SAVE.coins>=(u.cost==='inf'?annexCost(l):u.cost[l]);}))return true;
-  return RECIPES.some(r=>!known(r.id)&&tlvl()>=r.lvl&&(!r.need||upg('pan')>0)&&SAVE.coins>=r.price)||SAVE.free.koshey>0||SAVE.free.fire>0||skillPts()>0;}
+function anyAffordable(){if(UPG.some(u=>{if(!locOk(u))return false;const l=upg(u.id),max=u.cost==='inf'?1e9:u.cost.length;return l<max&&(!u.lvl||tlvl()>=u.lvl)&&SAVE.coins>=(u.cost==='inf'?annexCost(l):u.cost[l]);}))return true;
+  return RECIPES.some(r=>locOk(r)&&!known(r.id)&&tlvl()>=r.lvl&&(!r.need||upg('pan')>0)&&SAVE.coins>=r.price)||SAVE.free.koshey>0||SAVE.free.fire>0||skillPts()>0;}
 
 // ---------- network play: rooms by code, WebRTC P2P, voice ----------
 // Signalling goes through public MQTT brokers over WebSocket (no account needed); after the handshake
@@ -1573,7 +1645,7 @@ function moveLabel(b){const same=k=>ACTS.slice(0,4).every(a=>b[a]===BIND[k][a]);
 function myScheme(){return {s:NET.scheme,k:BIND[NET.scheme]};}
 NET.scheme='wasd';try{const v=localStorage.getItem('kuhnya-ctrl');if(SCH[v])NET.scheme=v;}catch(e){}NET.peerScheme=null;
 function netActOf(code){if(/^Digit[1-4]$/.test(code))return 'qb'+code.slice(5);if(code==='Space'||code==='Enter')return 'ok';if(code==='KeyP'||code==='Escape')return 'pause';return SCH[NET.scheme][code]||null;}
-function netMapHost(code){if(!NET.heroes||!(S.scene==='play'||S.scene==='tutorial'))return code;const a=SCH[NET.scheme][code];if(a)return heroCode(NET.heroes.h,a);return CODE2ACT[code]?'NetOff':code;}
+function netMapHost(code){if(!NET.heroes||S.paused||!(S.scene==='play'||S.scene==='tutorial'))return code;const a=SCH[NET.scheme][code];if(a)return heroCode(NET.heroes.h,a);return CODE2ACT[code]?'NetOff':code;}
 function netGuestKey(e,down){if(document.activeElement&&/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName))return;
   const a=netActOf(e.code);if(!a)return;e.preventDefault();if(down&&e.repeat)return;netSend({t:'k',a,d:down?1:0});}
 function netGuestBlur(){for(const a of ACTS)netSend({t:'k',a,d:0});}
@@ -1871,6 +1943,7 @@ function drawNightEnd(){
   if(LOC.pay>1)line('Владение: '+LOC.short,'(оплата ×'+LOC.pay+')','#9fd0f0');
   if(r.spent)line('Покупки в ночи','−'+r.spent,C.cin);
   if(r.wages)line('Жалованье работникам'+(r.ok?'':' (половина)'),'−'+r.wages,C.cin);
+  if(r.kazna)line('Проценты Кощеевой казны','+'+r.kazna,'#ffe08a');
   ctx.fillStyle=C.gold;ctx.fillRect(lx,y-12,cw,1);y+=6;
   ctx.font='bold 18px '+FB;ctx.textAlign='left';ctx.fillStyle=C.gold2;ctx.fillText('В кошель',lx,y);ctx.textAlign='right';ctx.fillStyle=r.net>=0?C.gold2:C.cin;ctx.fillText((r.net>=0?'+':'')+r.net,lx+cw,y);y+=22;
   ctx.font='13px '+FB;ctx.textAlign='left';ctx.fillStyle=C.muted;ctx.fillText('Всего в кошеле: '+SAVE.coins+(r.rec?'   ·   рекорд выручки!':''),lx,y);
@@ -1939,20 +2012,28 @@ function drawWorld(){
 
 // ---------- shop ----------
 function openShop(){if(S.scene==='play'||S.scene==='tutorial')return;S.scene='shop';S.shopCat=S.shopCat||0;S.shopSel=0;setDrone(0);}
-function setCat(i){S.shopCat=i;S.shopSel=0;S.pick=null;if(CATS[i].key==='music')S.shopSel=Math.max(0,MUSIC.findIndex(m=>m.id===SAVE.musEq.menu));const k=CATS[i].key,c=COSM.find(c=>c.key===k);if(c)S.shopSel=Math.max(0,c.items.findIndex(it=>it.id===SAVE.eq[k]));beep(600,.05,'sine',.04);}
+function setCat(i){S.shopCat=i;S.shopSel=0;S.shopRow=0;S.pick=null;if(CATS[i].key==='music')S.shopSel=Math.max(0,MUSIC.findIndex(m=>m.id===SAVE.musEq.menu));const k=CATS[i].key,c=COSM.find(c=>c.key===k);if(c)S.shopSel=Math.max(0,c.items.findIndex(it=>it.id===SAVE.eq[k]));beep(600,.05,'sine',.04);}
 function catItems(key){switch(key){case 'case':return CASE;case 'tales':return Object.keys(TALES);case 'tavern':case 'ach':return [];case 'loc':return LOCS;case 'perks':return PERKS;case 'upg':return UPG;case 'staff':return STAFF;case 'rec':return RECIPES;case 'items':return ITEMS;case 'chest':return CHESTS;case 'music':return MUSIC;default:return COSM.find(c=>c.key===key).items;}}
 function ingText(d){for(const k in REC)if(REC[k][d])return REC[k][d].map(x=>ING[x]).join(' + ')+' → '+STNAME[k];return '';}
-function itemInfo(key,it){
+const LOCTAG={moroz:'#9fd0f0',boloto:'#8fd18f',koshey:'#e0503a',sky:'#ffcf4a'};
+const locOk=it=>!it||!it.loc||SAVE.locs.includes(it.loc);
+function itemInfo(key,it){const inf=itemInfo0(key,it);
+  if(key!=='loc'&&!locOk(it)){const L=LOCS.find(l=>l.id===it.loc);return Object.assign({},inf,{status:L.short,locked:true,act:null,done:false,desc:inf.desc+' Откроется, когда купите владение «'+L.short+'».',hint:'Нужно владение «'+L.short+'»'});}
+  return inf;}
+function itemInfo0(key,it){
   const L=tlvl();
   if(key==='tales'){const lines=TALES[it],heard=lines.map((t,i)=>SAVE.tales.includes(it+':'+i)?t:null).filter(Boolean);
     return {name:GNAME[it],act:'read',hint:'Пробел — открыть книгу',desc:'',lines:lines.map((t,i)=>SAVE.tales.includes(it+':'+i)?(i+1)+'. «'+t+'»':(i+1)+'. ???  — пока не рассказано'),sub:'услышано '+heard.length+' / '+lines.length,status:heard.length===lines.length?'все сказания':'',done:heard.length===lines.length};}
-  if(key==='loc'){const own=SAVE.locs.includes(it.id),cur=SAVE.loc===it.id,sub='оплата ×'+it.pay;
+  if(key==='loc'){const own=SAVE.locs.includes(it.id),cur=SAVE.loc===it.id,sub='оплата ×'+it.pay;if(it.id!=='les'&&!/В лавке откро/.test(it.desc))it.desc+=' В лавке откроются: 2 умения, улучшение, работник, рецепт, зелье, сундук, наряды Егору и Катюше, кухня, роспись утвари и напев.';
     if(cur)return {name:it.name,desc:it.desc,sub,status:'вы здесь',done:true};
     if(own)return {name:it.name,desc:it.desc,sub,status:'перебраться сюда',act:'eq'};
     if(L<it.lvl)return {name:it.name,desc:it.desc,sub,status:'нужен '+it.lvl+' ур. трактира',locked:true};
     return {name:it.name,desc:it.desc,sub,price:it.price,status:it.price+' гр',act:'buy'};}
-  if(key==='perks'){if(perk(it.id))return {name:it.name,desc:it.desc,sub:'стоит '+it.cost+' оч.',status:'изучено',done:true};
-    return skillPts()>=it.cost?{name:it.name,desc:it.desc+' Очки умений дают новые уровни трактира и грамоты.',sub:'стоит '+it.cost+' оч.',status:'изучить',act:'perk'}:{name:it.name,desc:it.desc+' Очки умений дают новые уровни трактира и грамоты.',sub:'стоит '+it.cost+' оч.',status:'мало очков ('+skillPts()+')',locked:true};}
+  if(key==='perks'){const lv=perkLv(it.id),max=it.v.length-1,nx=lv+1,cost=it.cost*nx,sub='ур. '+lv+' / '+max;
+    const cur=lv?'Сейчас: '+it.fmt(it.v[lv])+'. ':'',nxt=lv<max?(lv?'Ур. '+nx+': ':'Ур. 1: ')+it.fmt(it.v[nx])+'.':'Изучено полностью.';
+    const desc=cur+nxt+(it.where?' Действует '+it.where+'.':'')+' Очки умений дают уровни трактира, грамоты и выводы в «Деле деда».';
+    if(lv>=max)return {name:it.name,desc,sub,status:'изучено полностью',done:true};
+    return skillPts()>=cost?{name:it.name,desc,sub,status:(lv?'улучшить':'изучить')+' — '+cost+' оч.',act:'perk',hint:'Пробел — '+(lv?'улучшить':'изучить')}:{name:it.name,desc,sub,status:'нужно '+cost+' оч. (есть '+skillPts()+')',locked:true};}
   if(key==='upg'){const l=upg(it.id),max=it.cost==='inf'?Infinity:it.cost.length,price=it.cost==='inf'?annexCost(l):it.cost[l];
     const sub='ур. '+l+(max===Infinity?'':' / '+max);
     if(it.lvl&&L<it.lvl)return {name:it.name,desc:it.desc,sub,status:'нужен '+it.lvl+' ур. трактира',locked:true};
@@ -1980,7 +2061,7 @@ function shopAct(){
   const key=CATS[S.shopCat].key,items=catItems(key),it=items[S.shopSel];if(!it)return;const inf=itemInfo(key,it);
   const msg=(t,c)=>{S.shopMsg={t,life:2,col:c};};
   if(!inf.act){if(inf.locked){msg('Пока недоступно: '+inf.status,C.cin);sfx.bad();}return;}
-  if(inf.act==='perk'){SAVE.perks.push(it.id);persist();msg('Новое умение: '+it.name,C.gold2);sfx.serve();return;}
+  if(inf.act==='perk'){SAVE.perkLv[it.id]=perkLv(it.id)+1;syncPerks();persist();msg(it.name+': уровень '+perkLv(it.id),C.gold2);sfx.serve();return;}
   if(inf.act==='eq'&&key==='loc'){SAVE.loc=it.id;setLoc(it.id);persist();msg('Трактир переезжает: '+it.name,C.gold2);beep(880,.1,'sine',.06);return;}
   if(inf.act==='eq'&&key==='music'){SAVE.musEq[it.slot]=it.id;persist();msg('Теперь '+(it.slot==='menu'?'в меню':'по ночам')+' играет «'+it.name+'»','#8fd18f');return;}
   if(inf.act==='eq'){SAVE.eq[key]=it.id;persist();msg('Надето: '+it.name,'#8fd18f');beep(880,.1,'sine',.06);return;}
@@ -1990,7 +2071,7 @@ function shopAct(){
   if(SAVE.coins<inf.price){msg('Не хватает '+(inf.price-SAVE.coins)+' грошей',C.cin);sfx.bad();return;}
   SAVE.coins-=inf.price;
   if(key==='upg'){SAVE.upg[it.id]=upg(it.id)+1;msg(it.name+': уровень '+upg(it.id),C.gold2);}
-  else if(key==='loc'){SAVE.locs.push(it.id);SAVE.loc=it.id;setLoc(it.id);msg('Новое владение: '+it.name+'. Следующая ночь — здесь',C.gold2);}
+  else if(key==='loc'){SAVE.locs.push(it.id);SAVE.loc=it.id;setLoc(it.id);msg('Новое владение: '+it.short+'. В лавке открылись новинки!',C.gold2);}
   else if(key==='staff'){SAVE.staff[it.id]={on:true};msg(it.name+' теперь работает в трактире',C.gold2);}
   else if(key==='rec'){SAVE.rec.push(it.id);msg('Новый рецепт: '+DISH[it.id].name+'. Гости начнут его заказывать',C.gold2);}
   else if(key==='items'){SAVE.inv[it.id]=(SAVE.inv[it.id]|0)+1;msg(it.name+' — в запасе '+SAVE.inv[it.id],C.gold2);}
@@ -2000,7 +2081,8 @@ function shopAct(){
 }
 const SG={x:200,y:76,cw:164,ch:150,gap:8,cols:5,sx:16,sw:168,step:31};
 const talesCat=()=>CATS[S.shopCat]&&CATS[S.shopCat].key==='tales',caseCat=()=>CATS[S.shopCat]&&CATS[S.shopCat].key==='case',gcols=()=>talesCat()?6:caseCat()?4:5;
-function cellXY(i){if(caseCat()){const cw=200,row=i<8?Math.floor(i/4):2+Math.floor((i-8)/4),col=i<8?i%4:(i-8)%4,ch=i<8?58:52;return [SG.x+14+col*(cw+10),SG.y+30+(i<8?row*66:154+(row-2)*60),cw,ch];}if(talesCat()){const cw=136,ch=72;return [SG.x+(i%6)*(cw+7),SG.y+Math.floor(i/6)*(ch+6),cw,ch];}return [SG.x+(i%SG.cols)*(SG.cw+SG.gap),SG.y+Math.floor(i/SG.cols)*(SG.ch+SG.gap),SG.cw,SG.ch];}
+function cellXY(i){if(!caseCat()&&!talesCat()){const r=Math.floor(i/SG.cols)-(S.shopRow||0);if(r<0||r>1)return [-9999,-9999,SG.cw,SG.ch];return [SG.x+(i%SG.cols)*(SG.cw+SG.gap),SG.y+r*(SG.ch+SG.gap),SG.cw,SG.ch];}
+if(caseCat()){const cw=200,row=i<8?Math.floor(i/4):2+Math.floor((i-8)/4),col=i<8?i%4:(i-8)%4,ch=i<8?58:52;return [SG.x+14+col*(cw+10),SG.y+30+(i<8?row*66:154+(row-2)*60),cw,ch];}if(talesCat()){const cw=136,ch=72;return [SG.x+(i%6)*(cw+7),SG.y+Math.floor(i/6)*(ch+6),cw,ch];}return [SG.x+(i%SG.cols)*(SG.cw+SG.gap),SG.y+Math.floor(i/SG.cols)*(SG.ch+SG.gap),SG.cw,SG.ch];}
 function shopClick(mx,my){
   for(let i=0;i<CATS.length;i++){const y=SG.y+i*SG.step;if(mx>=SG.sx&&mx<=SG.sx+SG.sw&&my>=y&&my<=y+SG.step-4){setCat(i);return;}}
   const items=catItems(CATS[S.shopCat].key);
@@ -2017,6 +2099,10 @@ function upgIcon(id,cx,cy){
   if(id==='bell'){ctx.fillStyle='#d9a441';ctx.beginPath();ctx.moveTo(cx-16,cy+12);ctx.quadraticCurveTo(cx-14,cy-20,cx,cy-20);ctx.quadraticCurveTo(cx+14,cy-20,cx+16,cy+12);ctx.fill();circ(cx,cy+15,4,'#a8741a');rr(cx-2,cy-28,4,8,2,'#5a3a20');return;}
   if(id==='tables'){if(ok('table'))ctx.drawImage(IMG.table,cx-28,cy-26,56,52);ctx.strokeStyle='#d9a441';ctx.lineWidth=2;ctx.strokeRect(cx-22,cy-20,44,36);return;}
   if(id==='sign'){rr(cx-34,cy-14,68,28,4,'#7a1d14');ctx.strokeStyle='#d9a441';ctx.lineWidth=1.5;ctx.strokeRect(cx-31.5,cy-11.5,63,23);ctx.fillStyle='#ffe08a';ctx.font='bold 11px '+FB;ctx.textAlign='center';ctx.fillText('ТРАКТИР',cx,cy+4);return;}
+  if(id==='ledn'){rr(cx-20,cy-18,40,36,6,'#bfe3ff');rr(cx-16,cy-14,32,28,4,'#e8f6ff');ctx.strokeStyle='#7ab8e8';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(cx-10,cy-6);ctx.lineTo(cx+10,cy+6);ctx.moveTo(cx+10,cy-6);ctx.lineTo(cx-10,cy+6);ctx.moveTo(cx,cy-10);ctx.lineTo(cx,cy+10);ctx.stroke();return;}
+  if(id==='most'){for(let i=0;i<4;i++)rr(cx-30+i*15,cy+4,13,10,2,'#7a5a30');rr(cx+14,cy-26,4,30,1,'#4a3a20');const g=ctx.createRadialGradient(cx+16,cy-24,1,cx+16,cy-24,14);g.addColorStop(0,'rgba(255,220,120,.95)');g.addColorStop(1,'rgba(255,180,60,0)');ctx.fillStyle=g;ctx.fillRect(cx,cy-40,32,32);circ(cx+16,cy-24,4,'#ffe08a');return;}
+  if(id==='kazna'){rr(cx-24,cy-8,48,28,4,'#4a1a12');rr(cx-24,cy-14,48,10,4,'#6a2a1c');ctx.strokeStyle='#d9a441';ctx.lineWidth=2;ctx.strokeRect(cx-24,cy-14,48,34);drawCoins(cx,cy-20,.8);return;}
+  if(id==='oblako'){for(const [a,b,r] of [[-14,4,12],[0,-4,15],[14,4,12],[0,8,12]])circ(cx+a,cy+b,r,'#e8e4f0');circ(cx+4,cy-6,5,'#ffcf4a');return;}
   if(id==='annex'){drawTavern(cx,cy+28,Math.min(tlvl(),4),Math.min(upg('annex')+1,2),.32);return;}
 }
 function musIcon(M,cx,cy,sel){
@@ -2052,22 +2138,25 @@ function drawShop(){
   else if(key==='case'){drawCasePage();}
   else if(key==='ach'){drawAchPage();}
   else{const items=catItems(key);
-    items.forEach((it,i)=>{const [x,y,cw,ch]=cellXY(i),sel=S.shopSel===i,inf=itemInfo(key,it);
+    if(key!=='tales'){const rows=Math.ceil(items.length/SG.cols),sr=Math.floor(S.shopSel/SG.cols);S.shopRow=Math.max(0,Math.min(Math.max(0,rows-2),Math.min(Math.max(S.shopRow||0,sr-1),sr)));
+      if(rows>2){ctx.textAlign='right';ctx.font='bold 12px '+FB;ctx.fillStyle=S.shopRow>0?C.gold2:'#3a2a1c';ctx.fillText('▲',W-4,SG.y+14);ctx.fillStyle=S.shopRow+2<rows?C.gold2:'#3a2a1c';ctx.fillText('▼',W-4,SG.y+2*(SG.ch+SG.gap)-12);}}
+    items.forEach((it,i)=>{const [x,y,cw,ch]=cellXY(i),sel=S.shopSel===i,inf=itemInfo(key,it);if(x<-1000)return;
       if(key==='tales'){rr(x,y,cw,ch,8,sel?'#26150e':'#150f0c');ctx.strokeStyle=sel?C.gold2:inf.done?'#5f8f5f':'#3a2a1c';ctx.lineWidth=sel?2.5:1;ctx.beginPath();ctx.roundRect(x+.5,y+.5,cw-1,ch-1,8);ctx.stroke();
         ctx.save();ctx.beginPath();ctx.rect(x+2,y+2,56,ch-4);ctx.clip();drawSprite(it,x+30,y+ch-2,it==='viy'?60:52,sel?S.blink*5:0);ctx.restore();
         ctx.textAlign='left';ctx.fillStyle=C.ivory;ctx.font='bold 12px '+FB;wrap(inf.name,x+58,y+24,cw-62,14);ctx.fillStyle=inf.done?'#8fd18f':C.muted;ctx.font='12px '+FB;ctx.fillText(inf.sub.replace('услышано ',''),x+58,y+ch-12);return;}
       rr(x,y,SG.cw,SG.ch,8,sel?'#26150e':'#150f0c');ctx.strokeStyle=sel?C.gold2:inf.done?'#5f8f5f':'#3a2a1c';ctx.lineWidth=sel?2.5:1;ctx.beginPath();ctx.roundRect(x+.5,y+.5,SG.cw-1,SG.ch-1,8);ctx.stroke();
+      if(it&&it.loc){ctx.fillStyle=LOCTAG[it.loc];ctx.beginPath();ctx.moveTo(x+SG.cw-22,y+1.5);ctx.lineTo(x+SG.cw-8,y+1.5);ctx.quadraticCurveTo(x+SG.cw-1.5,y+1.5,x+SG.cw-1.5,y+8);ctx.lineTo(x+SG.cw-1.5,y+22);ctx.closePath();ctx.fill();}
       const cx=x+SG.cw/2,cy=y+50;ctx.save();if(inf.locked)ctx.globalAlpha=.4;
       if(key==='tales')drawSprite(it,cx,cy+36,it==='viy'?80:70,sel?S.blink*5:0);
       else if(key==='upg')upgIcon(it.id,cx,cy);
       else if(key==='loc'){ctx.save();ctx.beginPath();ctx.rect(x+8,cy-38,SG.cw-16,72);ctx.clip();const K=it.kit||KIT.dub;ctx.fillStyle=getFloorPat(K.floor)||'#3b2617';ctx.fillRect(x+8,cy-38,SG.cw-16,72);if(K.tint){ctx.fillStyle=K.tint;ctx.fillRect(x+8,cy-38,SG.cw-16,72);}
         const ro=it.roster||['kust','rus','baun'];drawSprite(ro[0],cx-34,cy+34,58,sel?S.blink*5:0);drawSprite(ro[1],cx+4,cy+34,58,sel?S.blink*5:0,true);drawSprite(ro[2],cx+40,cy+34,52,sel?S.blink*5:0);ctx.restore();}
-      else if(key==='perks'){circ(cx,cy,30,inf.done?'#2e4a2a':'#2a1f18');ctx.strokeStyle=inf.done?'#8fd18f':C.gold;ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,30,0,Math.PI*2);ctx.stroke();const pk='ch_'+PERK_ICON[it.id];if(ok(pk))ctx.drawImage(IMG[pk],cx-26,cy-26,52,52);}
+      else if(key==='perks'){circ(cx,cy,30,inf.done?'#2e4a2a':'#2a1f18');ctx.strokeStyle=inf.done?'#8fd18f':C.gold;ctx.lineWidth=2;ctx.beginPath();ctx.arc(cx,cy,30,0,Math.PI*2);ctx.stroke();const pk='ch_'+PERK_ICON[it.id];if(ok(pk))ctx.drawImage(IMG[pk],cx-26,cy-26,52,52);const mx=it.v.length-1,lv=perkLv(it.id);for(let k=0;k<mx;k++){circ(cx-(mx-1)*8+k*16,cy+40,4.5,k<lv?'#8fd18f':'#3a2a1c');}}
       else if(key==='staff'){drawWorker(it.id,cx,cy+36,80,0,1,sel,S.blink);}
       else if(key==='rec'){drawItem(it.id,cx+22,cy+4,1.1);drawSprite(DISH[it.id].g,cx-26,cy+30,64,sel?S.blink*5:0);}
       else if(key==='items')drawPotion(it.id,cx,cy,1.5);
       else if(key==='music')musIcon(it,cx,cy,sel);
-      else if(key==='chest'){const k=it.spr;if(ok(k))ctx.drawImage(IMG[k],cx-30,cy-32,60,60);}
+      else if(key==='chest'){const k=it.spr;if(ok(k))ctx.drawImage(it.tint?(tinted(k,it.tint)||IMG[k]):IMG[k],cx-30,cy-32,60,60);}
       else if(key==='egor'||key==='katya'){const k=key+'_'+it.id;if(ok(k))ctx.drawImage(IMG[k],(sel?Math.floor(S.blink*6)%4:0)*32,0,32,32,cx-38,cy-44,76,76);}
       else if(key==='kitchen'){const K=KIT[it.id];ctx.fillStyle=getFloorPat(K.floor)||'#3b2617';ctx.fillRect(cx-56,cy-34,112,64);if(K.tint){ctx.fillStyle=K.tint;ctx.fillRect(cx-56,cy-34,112,64);}for(let k=0;k<3;k++){if(ok('table'))ctx.drawImage(IMG.table,cx-56+k*38,cy-34,36,30);if(K.ctint){ctx.fillStyle=K.ctint;ctx.fillRect(cx-56+k*38,cy-34,36,30);}}}
       else if(key==='tools'){const T=TOOLS[it.id];ctx.translate(cx-58,cy-28);ctx.scale(.75,.75);drawCooker({kind:'pot',state:'cook',contents:[],t:.5},0,0,TILE/2,TILE/2-2,T);ctx.translate(TILE+10,0);drawCooker({kind:'oven',state:'cook',contents:[],t:.5},0,0,TILE/2,TILE/2-2,T);}
@@ -2158,9 +2247,10 @@ function drawTavernPage(){
   for(const [a,b] of rows){ctx.fillStyle=C.muted;ctx.font='13px '+FB;ctx.textAlign='left';ctx.fillText(a,x0+440,y);ctx.textAlign='right';ctx.fillStyle=C.ivory;ctx.fillText(b.length>34?b.slice(0,33)+'…':b,x0+w-24,y);y+=26;}
 }
 // ---------- chests ----------
-function unownedCosmetic(){const all=[];for(const c of COSM)for(const it of c.items)if(!SAVE.owned[c.key].includes(it.id))all.push({cat:c.key,id:it.id,name:c.title+': '+it.name});return all;}
+function unownedCosmetic(){const all=[];for(const c of COSM)for(const it of c.items)if(locOk(it)&&!SAVE.owned[c.key].includes(it.id))all.push({cat:c.key,id:it.id,name:c.title+': '+it.name});return all;}
 function rollChest(kind){
-  const r=Math.random(),it=()=>ITEMS[Math.floor(Math.random()*ITEMS.length)];
+  const CH=CHESTS.find(c=>c.id===kind);if(CH&&CH.base){const x=rollChest(CH.base);if(x.kind==='coins')x.n=Math.round(x.n*CH.mul/10)*10;if(x.kind==='item')x.n=Math.max(1,Math.round(x.n*CH.mul));return x;}
+  const r=Math.random(),IT=ITEMS.filter(locOk),it=()=>IT[Math.floor(Math.random()*IT.length)];
   const coins=(a,b,rar)=>({kind:'coins',n:Math.round(rnd(a,b)/10)*10,rar});
   if(kind==='daily'){const sk=SAVE.daily.last===yesterday()?SAVE.daily.streak+1:1;return Object.assign(coins(40+25*Math.min(sk,7),40+25*Math.min(sk,7),sk>=7?'e':sk>=3?'r':'c'),{daily:sk});}
   if(kind==='koshey'){
@@ -2171,7 +2261,7 @@ function rollChest(kind){
     const u=unownedCosmetic();if(u.length){const x=u[Math.floor(Math.random()*u.length)];return {kind:'skin',cat:x.cat,id:x.id,name:x.name,rar:'l'};}return coins(650,750,'l');}
   if(r<.25)return coins(200,350,'c');
   if(r<.55){const i=it();return {kind:'item',id:i.id,n:2,rar:'r'};}
-  if(r<.75){const ups=UPG.filter(u=>u.cost!=='inf'&&upg(u.id)<u.cost.length&&(!u.lvl||tlvl()>=u.lvl));if(ups.length){const u=ups[Math.floor(Math.random()*ups.length)];return {kind:'upg',id:u.id,rar:'e'};}return coins(650,800,'e');}
+  if(r<.75){const ups=UPG.filter(u=>u.cost!=='inf'&&upg(u.id)<u.cost.length&&(!u.lvl||tlvl()>=u.lvl)&&locOk(u));if(ups.length){const u=ups[Math.floor(Math.random()*ups.length)];return {kind:'upg',id:u.id,rar:'e'};}return coins(650,800,'e');}
   if(r<.9)return coins(900,1200,'e');
   const u=unownedCosmetic();if(u.length){const x=u[Math.floor(Math.random()*u.length)];return {kind:'skin',cat:x.cat,id:x.id,name:x.name,rar:'l'};}return coins(1800,2200,'l');
 }
@@ -2189,7 +2279,7 @@ function openChest(kind){
 function drawChestAnim(){
   const A=S.chestAnim,dur=3.2;A.t+=1/60;
   ctx.fillStyle='rgba(5,3,3,.9)';ctx.fillRect(0,0,W,H);
-  const title=A.kind==='daily'?'Сундук дня':A.kind==='fire'?'Ларец Жар-птицы':'Сундук Кощея';
+  const CH=CHESTS.find(c=>c.id===A.kind),title=A.kind==='daily'?'Сундук дня':CH?CH.name:'Сундук Кощея';
   ctx.textAlign='center';ctx.fillStyle=C.gold;ctx.font='28px '+FD;ctx.fillText(title,W/2,70);
   const cw=120,k=Math.min(1,A.t/dur),e=1-Math.pow(1-k,3),pos=e*(30*cw),cy=H/2-20;
   const step=Math.floor(pos/cw);if(step!==A.tick&&k<1){A.tick=step;beep(500+step*10,.03,'square',.03);}
@@ -2210,7 +2300,12 @@ setLoc(SAVE.loc);checkFacts();S.achQ=[];S.cfg=STORY[0];S.time=150;baseRound();if
 let last=performance.now();
 function frame(now){
   if(NET.role==='guest'){requestAnimationFrame(frame);return;}
+  try{frameBody(now);}catch(err){console.error('frame',err);try{ctx.restore();}catch(e){}}
+  requestAnimationFrame(frame);
+}
+function frameBody(now){
   const dt=Math.min(.05,(now-last)/1000);last=now;
+  if((S.scene==='play'||S.scene==='tutorial')&&S.stMap&&S.stMap!==MAP){MAP=S.stMap;rebuildMap();}
   update(dt);
   ctx.clearRect(0,0,W,H);ctx.imageSmoothingEnabled=false;
   if(S.scene==='title')drawTitle();
@@ -2229,7 +2324,6 @@ function frame(now){
   if(S.achPop){S.achPop.life-=1/60;const a=S.achPop.a,k=Math.min(1,S.achPop.life*2,(3.5-S.achPop.life)*4);ctx.globalAlpha=k;rr(W/2-230,8,460,52,10,'#1f2a18');ctx.strokeStyle='#8fd18f';ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(W/2-229,9,458,50,10);ctx.stroke();
     ctx.textAlign='center';ctx.fillStyle=a.fact?'#ffb347':'#8fd18f';ctx.font='bold 16px '+FB;ctx.fillText(a.fact?a.name:'Грамота: '+a.name,W/2,30);ctx.fillStyle=C.ivory;ctx.font='13px '+FB;ctx.fillText(a.fact?a.desc:a.desc+'   ·   +'+a.c+' грошей, +1 очко умений',W/2,49);ctx.globalAlpha=1;if(S.achPop.life<=0)S.achPop=null;}
   if(NET.capDraw&&NET.connected)NET.capDraw();
-  requestAnimationFrame(frame);
 }
 if(BOOT==='new')startPrologue(false);else if(BOOT==='cont'){S.scene=SAVE.tutDone?'title':'menu';}
 requestAnimationFrame(frame);

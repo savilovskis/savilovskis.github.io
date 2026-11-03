@@ -1687,6 +1687,8 @@ function netOnData(m){
   if(NET.role!=='host'||m.t!=='k'||!(ACTS.includes(m.a)||m.a==='ok'||m.a==='pause'||/^qb[1-4]$/.test(m.a)))return;
   if(S.scene==='lobby'){if(m.d)lobbyAct('g',m.a);return;}
   if(!NET.heroes)return;
+  if(S.scene==='menu'&&S.menu.page==='trips'){if(m.d)tripsNetAct('g',m.a);return;}
+  if(S.scene==='tripStory'){if(m.d&&(m.a==='use'||m.a==='ok'))tripStoryKey('Space');return;}
   if(m.a==='pause'){if(m.d&&(S.scene==='play'||S.scene==='tutorial'))togglePause();return;}
   if(m.a==='ok'){if(!m.d)return;if(S.scene==='mini'){miniKey('Space');return;}if(S.scene==='tripStory'){tripStoryKey('Space');return;}if(S.paused){togglePause(false);return;}if(['story','nightEnd','final','prologue','over'].includes(S.scene)||S.scene==='tutorial')advance();return;}
   if(S.paused||!(S.scene==='play'||S.scene==='tutorial'||S.scene==='mini'))return;
@@ -1771,12 +1773,14 @@ async function netGuestMsg(m,host){
   else if(m.t==='ice'&&NET.pc){if(NET.pc.remoteDescription)NET.pc.addIceCandidate(m.c).catch(()=>{});else NET.pend.push(m.c);}
   else if(m.t==='ice')(NET.pend=NET.pend||[]).push(m.c);}
 function netShowPanel(v){$('netPanel').hidden=!v;$('netSlot').textContent=SLOT;if(v){const t=localStorage.getItem('kuhnya-turn');try{const o=JSON.parse(t||'null');if(o){$('turnUrl').value=o.url||'';$('turnUser').value=o.user||'';$('turnPass').value=o.pass||'';}}catch(e){}}else cv.focus();}
-function netOpenLobby(){S.scene='lobby';S.lobby=S.lobby||{h:0,g:0,hr:false,gr:false,guest:NET.connected};S.lobby.hr=S.lobby.gr=false;S.lobby.guest=NET.connected;for(const k in keys)keys[k]=false;}
+function netOpenLobby(){S.scene='lobby';S.lobby=S.lobby||{h:0,g:0,hr:false,gr:false,guest:NET.connected,mode:'night'};S.lobby.hr=S.lobby.gr=false;S.lobby.guest=NET.connected;for(const k in keys)keys[k]=false;}
 function lobbyAct(who,a){const L=S.lobby;if(!L)return;const me=who,other=who==='h'?'g':'h';
   if(who==='g'&&!L.guest)L.guest=true;
+  if(a==='up'||a==='down'){if(L.hr||L.gr)return;const can=TRIPS.some(tripOpen);if(!can){L.mode='night';sfx.bad();return;}L.mode=L.mode==='trips'?'night':'trips';beep(700,.05,'sine',.04);return;}
   if(a==='left'||a==='right'){if(L[me+'r'])return;const want=a==='left'?-1:1,cur=L[me],nxt=cur===0?want:(cur===-want?0:cur);if(nxt!==0&&nxt===L[other]){sfx.bad();return;}L[me]=nxt;beep(600,.05,'sine',.04);return;}
   if(a==='ok'){if(L[me]===0){sfx.bad();return;}L[me+'r']=!L[me+'r'];beep(L[me+'r']?880:440,.08,'sine',.05);
     if(L.hr&&L.gr&&L.h!==L.g){NET.heroes={h:L.h<0?0:1,g:L.g<0?0:1};[523,659,784].forEach((f,i)=>setTimeout(()=>beep(f,.15,'sine',.06),i*90));
+      if(L.mode==='trips'&&TRIPS.some(tripOpen)){setTimeout(()=>{S.scene='menu';menuDo('trips');setBanner(P[NET.heroes.h].name+' — хозяин, '+P[NET.heroes.g].name+' — гость. Выбирайте вылазку вместе','#8fd18f');},700);return;}
       setTimeout(()=>{S.scene=SAVE.tutDone?'title':'prologue';if(!SAVE.tutDone)startPrologue(false);setBanner(P[NET.heroes.h].name+' — хозяин, '+P[NET.heroes.g].name+' — гость. Управление: у хозяина '+moveLabel(BIND[NET.scheme])+(NET.peerScheme?', у гостя '+moveLabel(bindOf(NET.heroes.g)):''),'#8fd18f');},700);}
     return;}
   if(a==='pause'&&who==='h'&&!L.hr){S.scene='menu';S.menu.page='main';}}
@@ -1790,8 +1794,12 @@ function drawLobby(){const L=S.lobby||{h:-1,g:1};
     const w=200;rr(x-w/2,y,w,40,20,r?'#1f3a18':'#2a1f18');ctx.strokeStyle=r?'#8fd18f':col;ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(x-w/2+.5,y+.5,w-1,39,20);ctx.stroke();
     ctx.fillStyle=r?'#8fd18f':C.ivory;ctx.font='bold 16px '+FB;ctx.fillText((pos!==0&&!r?'◂ ':'')+label+(who==='h'?' · '+moveLabel(BIND[NET.scheme]):NET.peerScheme?' · '+moveLabel(NET.peerKeys||BIND[NET.peerScheme]||BIND.wasd):'')+(r?' — готов ✓':'')+(pos!==0&&!r?' ▸':''),x,y+26);ctx.globalAlpha=1;
     if(pos===0&&!gone){ctx.fillStyle=C.muted;ctx.font='13px '+FB;ctx.fillText('◂ Егор   ·   Катюша ▸',x,y+58);}};
+  {const md=L.mode||'night',can=TRIPS.some(tripOpen);ctx.fillStyle=C.muted;ctx.font='13px '+FB;ctx.textAlign='center';ctx.fillText('Во что играем?',W/2,170);
+    [['night','Ночная смена','кухня, ночи, сюжет'],['trips','Вылазки','мини-игры вдвоём']].forEach(([id,t,sub],k)=>{const y=184+k*66,on=md===id,off=id==='trips'&&!can;ctx.globalAlpha=off?.4:1;
+      rr(W/2-120,y,240,54,10,on?'#3a1a10':'#150f0c');ctx.strokeStyle=on?C.gold2:'#3a2a1c';ctx.lineWidth=on?2.5:1;ctx.beginPath();ctx.roundRect(W/2-119.5,y+.5,239,53,10);ctx.stroke();
+      ctx.fillStyle=on?C.gold2:C.ivory;ctx.font='bold 17px '+FB;ctx.fillText((on?'▸ ':'')+t,W/2,y+24);ctx.fillStyle=C.muted;ctx.font='12px '+FB;ctx.fillText(off?'откроются после 5-й ночи':sub,W/2,y+42);ctx.globalAlpha=1;});}
   row('h',380,'Хозяин','#d9a441');row('g',450,L.guest?'Гость':'Гость (ещё не зашёл)','#5aa0e0');
-  hint(keyName(BIND[NET.scheme].left)+' '+keyName(BIND[NET.scheme].right)+' — выбрать героя   ·   Пробел — готов   ·   оба готовы — начинаем',H-24);}
+  hint(keyName(BIND[NET.scheme].left)+' '+keyName(BIND[NET.scheme].right)+' — герой   ·   '+keyName(BIND[NET.scheme].up)+' '+keyName(BIND[NET.scheme].down)+' — во что играем   ·   Пробел — готов',H-24);}
 // --- UI wiring ---
 $('netHost').addEventListener('click',()=>netHost());
 $('netJoin').addEventListener('click',()=>netJoin());
@@ -1869,13 +1877,19 @@ function tripReward(i,win,score){const T=TRIPS[i],s=tripSt(T.id),L=tlvl(),out=[]
   else if(SAVE.night-s.last>=5){const c=Math.round((150+20*L)/10)*10;SAVE.coins+=c;out.push('+'+c+' грошей');SAVE.free.koshey++;out.push('Сундук Кощея');}
   else out.push('Тренировка: награда снова через '+(5-(SAVE.night-s.last))+' ноч.');
   if(!s.won||SAVE.night-s.last>=5)s.last=SAVE.night;s.won++;persist();checkAch();return out;}
+function netCoop(){return typeof NET!=='undefined'&&NET.role==='host'&&!!NET.heroes&&NET.connected;}
+function netWaiting(){return typeof NET!=='undefined'&&NET.role==='host'&&!!NET.heroes&&!NET.connected;}
+function tripsNetAct(who,a){const M=S.menu,R=S.tready||(S.tready={h:false,g:false});
+  if(a==='left'||a==='up'||a==='right'||a==='down'){M.tsel=(M.tsel+(a==='left'||a==='up'?3:1))%4;if(R.h||R.g)beep(380,.05,'sine',.03);R.h=R.g=false;beep(600,.04,'sine',.03);return;}
+  if(a==='ok'||a==='use'){if(!tripOpen(TRIPS[M.tsel])){sfx.bad();return;}R[who]=!R[who];beep(R[who]?880:440,.08,'sine',.05);if(R.h&&R.g){R.h=R.g=false;tripStart(M.tsel);}return;}
+  if(a==='pause'&&who==='h'){M.page='main';}}
 function startMini(i){const id=TRIPS[i].id;S.scene='mini';S.mini=MINI[id].init(tripTier());S.mini.trip=i;S.mini.id=id;S.mini.res=null;S.mini.t=0;for(const k in keys)keys[k]=false;}
 function miniEnd(win,score){const M=S.mini;if(M.res)return;M.res={win,score:Math.round(score),items:tripReward(M.trip,win,score)};
   if(win)[523,659,784,1046].forEach((f,k)=>setTimeout(()=>beep(f,.2,'sine',.06),k*110));else sfx.curse();}
 const HK=i=>{const c=P[i].ctrl;return {l:!!keys[c.left],r:!!keys[c.right],u:!!keys[c.up],d:!!keys[c.down]};};
 function heroIdx(code){for(let i=0;i<2;i++){const c=P[i].ctrl;for(const a in c)if(c[a]===code)return [i,a];}return null;}
 function miniKey(code){const M=S.mini;if(!M)return;
-  if(M.res){if(code==='Space'||code==='Enter'||code==='Escape'){S.scene='menu';S.menu.page='trips';S.mini=null;}return;}
+  if(M.res){if(code==='Space'||code==='Enter'||code==='Escape'){S.scene='menu';S.menu.page='trips';S.mini=null;S.tready={h:false,g:false};}return;}
   if(code==='Escape'){if(M.quitAsk){S.scene='menu';S.menu.page='trips';S.mini=null;return;}M.quitAsk=2.5;return;}
   const h=heroIdx(code);if(h&&MINI[M.id].key)MINI[M.id].key(M,h[0],h[1]);}
 function drawHero(i,x,yb,size,row,moving,alpha){const k=skinKey(i);if(!ok(k))return;const fr=moving?Math.floor(S.blink*9)%4:0;ctx.save();if(alpha!==undefined)ctx.globalAlpha=alpha;
@@ -1884,6 +1898,7 @@ function hearts(x,y,n,max){for(let k=0;k<max;k++){ctx.fillStyle=k<n?'#e0503a':'#
 function miniHUD(M,title,extra){ctx.fillStyle='rgba(8,5,4,.78)';ctx.fillRect(0,0,W,44);ctx.textAlign='left';ctx.fillStyle=TRIPS[M.trip].col;ctx.font='20px '+FD;ctx.fillText(title,16,30);
   ctx.textAlign='right';ctx.fillStyle=C.ivory;ctx.font='bold 15px '+FB;ctx.fillText(extra,W-16,28);
   if(M.msg&&M.msg.life>0){M.msg.life-=1/60;ctx.textAlign='center';ctx.fillStyle='#ffe08a';ctx.font='bold 17px '+FB;ctx.fillText(M.msg.t,W/2,84);}
+  if(netWaiting()){ctx.fillStyle='rgba(5,3,3,.7)';ctx.fillRect(0,44,W,H-44);ctx.textAlign='center';ctx.fillStyle=C.gold2;ctx.font='26px '+FD;ctx.fillText('Связь с напарником пропала',W/2,H/2-10);ctx.fillStyle=C.ivory;ctx.font='16px '+FB;ctx.fillText('Вылазка на паузе. Напарник вернётся сам по тому же коду: '+NET.code,W/2,H/2+22);}
   if(M.quitAsk>0){M.quitAsk-=1/60;ctx.textAlign='center';ctx.fillStyle='#ffb347';ctx.font='bold 15px '+FB;ctx.fillText('Esc ещё раз — выйти без награды',W/2,64);}}
 function drawMiniResult(M){const r=M.res;ctx.fillStyle='rgba(5,3,3,.86)';ctx.fillRect(0,0,W,H);ctx.textAlign='center';ctx.fillStyle=r.win?C.gold:C.cin;ctx.font='40px '+FD;
   ctx.fillText(r.win?'Вылазка удалась!':'Не вышло…',W/2,150);ctx.fillStyle=C.ivory;ctx.font='18px '+FB;ctx.fillText('Счёт: '+r.score+'   ·   лучший: '+tripSt(TRIPS[M.trip].id).best,W/2,190);
@@ -2381,6 +2396,10 @@ function drawTripsPage(){const M=S.menu;ctx.fillStyle=C.gold;ctx.font='26px '+FD
     if(s.won){ctx.fillStyle=C.muted;ctx.font='12px '+FB;ctx.fillText('пройдено ×'+s.won+' · лучший счёт '+s.best,x+w/2,y+182);}ctx.globalAlpha=1;});
   const T=TRIPS[M.tsel],s=tripSt(T.id);rr(W/2-500,392,1000,92,8,'#150f0c');ctx.textAlign='left';ctx.fillStyle=T.col;ctx.font='bold 15px '+FB;ctx.fillText(s.won?'Страница дневника деда':T.name,W/2-486,414);
   ctx.fillStyle=s.won?'#e8d7a0':C.ivory;ctx.font=(s.won?'italic ':'')+'14px '+FB;wrap(s.won?T.page:T.teaser+' Первая победа — большая награда и страница дневника деда. Потом награда снова раз в 5 ночей.',W/2-486,436,972,18);
+  if(netCoop()||netWaiting()){const R=S.tready||{h:false,g:false};[['h',NET.heroes.h,'хозяин'],['g',NET.heroes.g,'гость']].forEach(([w,hi,lb],k)=>{const x=W/2+(k?150:-150),r=R[w],off=w==='g'&&!NET.connected;
+      rr(x-130,498,260,34,17,r?'#1f3a18':'#2a1f18');ctx.strokeStyle=off?'#5a4a3a':r?'#8fd18f':P[hi].tag;ctx.lineWidth=2;ctx.beginPath();ctx.roundRect(x-129.5,498.5,259,33,17);ctx.stroke();
+      ctx.fillStyle=off?C.muted:r?'#8fd18f':P[hi].tag;ctx.font='bold 15px '+FB;ctx.textAlign='center';ctx.fillText(P[hi].name+' ('+lb+')'+(off?' — нет связи':r?' — готов ✓':' — выбирает…'),x,520);});
+    ctx.fillStyle=C.muted;ctx.font='13px '+FB;ctx.textAlign='center';ctx.fillText('Выбирают оба: влево/вправо   ·   «взять» или Пробел — готов   ·   оба готовы — вылазка начинается   ·   Esc у хозяина — назад',W/2,H-18);return;}
   ctx.fillStyle=C.muted;ctx.font='13px '+FB;ctx.textAlign='center';ctx.fillText('← → — выбрать   ·   Пробел — начать   ·   Esc — назад   ·   играют оба, и за одной клавиатурой, и по сети',W/2,H-18);}
 
 // ---------- main menu ----------
@@ -2398,7 +2417,7 @@ function menuDo(id){const M=S.menu;beep(760,.07,'sine',.05);
   if(id==='cont'){if(SAVE.tutDone)S.scene='title';else startPrologue(false);return;}
   if(id==='new'||id==='load'){M.page='slots';M.mode=id;M.ssel=SLOT-1;M.confirm=false;return;}
   if(id==='net'){if(NET.role==='host')netOpenLobby();else netShowPanel(true);return;}
-  if(id==='trips'){M.page='trips';M.tsel=Math.max(0,TRIPS.findIndex(T=>tripOpen(T)&&tripReady(T)));return;}
+  if(id==='trips'){S.tready={h:false,g:false};M.page='trips';M.tsel=Math.max(0,TRIPS.findIndex(T=>tripOpen(T)&&tripReady(T)));return;}
   if(id==='pro')startPrologue('menu');
 }
 function slotPick(n){const M=S.menu,info=slotInfo(n);
@@ -2412,7 +2431,7 @@ function menuKey(code){const M=S.menu,up=code==='ArrowUp'||code==='KeyW',dn=code
     if(ok&&!it[M.sel].off)menuDo(it[M.sel].id);
     if(code==='KeyH')startPrologue('menu');
     return;}
-  if(M.page==='trips'){if(code==='Escape'||code==='KeyB'){M.page='main';return;}if(lf||up){M.tsel=(M.tsel+3)%4;beep(600,.04,'sine',.03);}if(rt||dn){M.tsel=(M.tsel+1)%4;beep(600,.04,'sine',.03);}if(ok){if(tripOpen(TRIPS[M.tsel]))tripStart(M.tsel);else sfx.bad();}return;}
+  if(M.page==='trips'){if(code==='Escape'||code==='KeyB'){M.page='main';return;}if(netCoop()){const sa=SCH[NET.scheme]&&SCH[NET.scheme][code],a=sa&&['left','right','up','down','use'].includes(sa)?sa:lf?'left':rt?'right':up?'up':dn?'down':ok?'ok':null;if(a)tripsNetAct('h',a);return;}if(lf||up){M.tsel=(M.tsel+3)%4;beep(600,.04,'sine',.03);}if(rt||dn){M.tsel=(M.tsel+1)%4;beep(600,.04,'sine',.03);}if(ok){if(tripOpen(TRIPS[M.tsel]))tripStart(M.tsel);else sfx.bad();}return;}
   if(code==='Escape'||code==='KeyB'){if(M.confirm)M.confirm=false;else M.page='main';M.msg='';return;}
   if(M.confirm){if(ok)slotPick(M.ssel+1);else if(lf||rt){M.confirm=false;}return;}
   if(lf||up){M.ssel=(M.ssel+2)%3;M.msg='';beep(600,.04,'sine',.03);}
@@ -2421,7 +2440,7 @@ function menuKey(code){const M=S.menu,up=code==='ArrowUp'||code==='KeyW',dn=code
 }
 function menuClick(mx,my){const M=S.menu;
   if(M.page==='main'){menuItems().forEach((it,i)=>{const y=MENU_Y+i*(MENU_H+MENU_GAP);if(!it.off&&mx>=W/2-MENU_W/2&&mx<=W/2+MENU_W/2&&my>=y&&my<=y+MENU_H){M.sel=i;menuDo(it.id);}});return;}
-  if(M.page==='trips'){for(let i=0;i<4;i++){const x=W/2-500+i*252;if(mx>=x&&mx<=x+236&&my>=176&&my<=376){if(M.tsel===i&&tripOpen(TRIPS[i]))tripStart(i);else{M.tsel=i;beep(600,.04,'sine',.03);}return;}}if(my>H-40)M.page='main';return;}
+  if(M.page==='trips'){for(let i=0;i<4;i++){const x=W/2-500+i*252;if(mx>=x&&mx<=x+236&&my>=176&&my<=376){if(netCoop()){if(M.tsel===i)tripsNetAct('h','ok');else{M.tsel=i;S.tready={h:false,g:false};beep(600,.04,'sine',.03);}return;}if(M.tsel===i&&tripOpen(TRIPS[i]))tripStart(i);else{M.tsel=i;beep(600,.04,'sine',.03);}return;}}if(my>H-40)M.page='main';return;}
   for(let i=0;i<3;i++){const x=W/2-480+i*330;if(mx>=x&&mx<=x+300&&my>=170&&my<=390){if(M.ssel===i)slotPick(i+1);else{M.ssel=i;M.confirm=false;M.msg='';beep(600,.04,'sine',.03);}return;}}
   if(M.confirm&&my>=410&&my<=450){if(mx<W/2)slotPick(M.ssel+1);else M.confirm=false;return;}
   if(my>H-40){M.page='main';M.confirm=false;}
@@ -2907,7 +2926,7 @@ function frameBody(now){
   const dt=Math.min(.05,(now-last)/1000);last=now;
   if((S.scene==='play'||S.scene==='tutorial')&&S.stMap&&S.stMap!==MAP){MAP=S.stMap;rebuildMap();}
   update(dt);
-  if(S.scene==='mini'&&S.mini&&!S.mini.res)MINI[S.mini.id].update(S.mini,dt);
+  if(S.scene==='mini'&&S.mini&&!S.mini.res){if(netWaiting()){if(S.mini.id==='svadba')S.mini.a0+=dt;}else MINI[S.mini.id].update(S.mini,dt);}
   ctx.clearRect(0,0,W,H);ctx.imageSmoothingEnabled=false;
   if(S.scene==='title')drawTitle();
   else if(S.scene==='menu')drawMenu();

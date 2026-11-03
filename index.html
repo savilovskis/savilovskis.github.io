@@ -1683,7 +1683,7 @@ function netOnData(m){
   NET.lastRx=performance.now();
   if(m.t==='ping'){netSend({t:'pong',ts:m.ts});return;}
   if(m.t==='scheme'){if(SCH[m.s]){NET.peerScheme=m.s;NET.peerKeys=okBind(m.k)?m.k:null;}return;}
-  if(m.t==='pong'){NET.rtt=Math.round(performance.now()-m.ts);$('netBarPing').textContent='задержка '+NET.rtt+' мс';return;}
+  if(m.t==='pong'){NET.rtt=Math.round(performance.now()-m.ts);NET.rttS=NET.rttS?NET.rttS*.85+NET.rtt*.15:NET.rtt;NET.jit=(NET.jit||0)*.85+Math.abs(NET.rtt-NET.rttS)*.15;NET.rttMax=Math.max(NET.rtt,(NET.rttMax||0)*.97);$('netBarPing').textContent='задержка '+NET.rtt+' мс';return;}
   if(NET.role!=='host'||m.t!=='k'||!(ACTS.includes(m.a)||m.a==='ok'||m.a==='pause'||/^qb[1-4]$/.test(m.a)))return;
   if(S.scene==='lobby'){if(m.d)lobbyAct('g',m.a);return;}
   if(!NET.heroes)return;
@@ -1704,7 +1704,7 @@ function netPC(){const pc=new RTCPeerConnection({iceServers:iceServers()});
   return pc;}
 function netConnected(){NET.relinking=false;$('netRe').hidden=true;clearInterval(NET.helloT);NET.lastRx=performance.now();clearInterval(NET.wdT);NET.wdT=setInterval(()=>{if(NET.connected&&performance.now()-NET.lastRx>7000)netLost('Связь с напарником пропала.');},1000);
   netRemember();$('netBar').hidden=false;$('netHud').hidden=false;$('netBarCode').textContent=NET.code;$('netBarRole').textContent=NET.role==='host'?'Вы — хозяин':'Вы — гость';
-  clearInterval(NET.pingT);NET.pingT=setInterval(()=>netSend({t:'ping',ts:performance.now()}),2000);setTimeout(()=>netSend(Object.assign({t:'scheme'},myScheme())),300);
+  clearInterval(NET.pingT);NET.pingT=setInterval(()=>netSend({t:'ping',ts:performance.now()}),700);setTimeout(()=>netSend(Object.assign({t:'scheme'},myScheme())),300);
   if(NET.role==='host'){netShowPanel(false);if(S.scene!=='lobby'&&!NET.heroes)netOpenLobby();if(S.lobby)S.lobby.guest=true;
     if(NET.heroes&&S.scene!=='lobby')setBanner('Напарник снова с нами','#8fd18f');
     for(const s_ of NET.pc.getSenders())if(s_.track&&s_.track.kind==='video'){const p=s_.getParameters();p.encodings=p.encodings&&p.encodings.length?p.encodings:[{}];p.encodings[0].maxBitrate=9000000;p.degradationPreference='maintain-resolution';p.encodings[0].maxFramerate=30;p.encodings[0].scaleResolutionDownBy=1;s_.setParameters(p).catch(()=>{});}}
@@ -1917,7 +1917,10 @@ function nine(k,x,y,w,h,c,s){if(!ok(k))return;const im=IMG[k],sw=im.naturalWidth
   for(const a of cx)for(const b of cy)if(a[3]>0&&b[3]>0)ctx.drawImage(im,a[0],b[0],a[1],b[1],a[2],b[2],Math.ceil(a[3]),Math.ceil(b[3]));}
 function miniShake(M){if(M.shake>0){M.shake=Math.max(0,M.shake-1/60);ctx.translate(rnd(-1,1)*M.shake*12,rnd(-1,1)*M.shake*12);}}
 function keyLbl(code){return String(code||'?').replace(/^Key/,'').replace(/^Digit/,'').replace('ArrowLeft','←').replace('ArrowRight','→').replace('ArrowUp','↑').replace('ArrowDown','↓');}
-function netLag(i){return (typeof NET!=='undefined'&&NET.role==='host'&&NET.heroes&&i!==NET.heroes.h)?Math.min(.3,(NET.rtt||80)/2000+.1):0;}
+function netGuest(i){return typeof NET!=='undefined'&&NET.role==='host'&&!!NET.heroes&&i!==NET.heroes.h;}
+function netLag(i){return netGuest(i)?Math.min(.32,(NET.rttS||NET.rtt||80)/2000+.1):0;}
+// Wi-Fi jitter: extra slack for the guest, from the spread of recent pings
+function netSlack(i){return netGuest(i)?Math.min(.12,((NET.jit||0)*2+Math.max(0,(NET.rttMax||0)-(NET.rttS||0))*.5)/1000+.03):0;}
 const heldWork=i=>!!keys[P[i].ctrl.work];
 function lantern(x,y,lit){rr(x-3,y-64,6,64,2,'#2a1a10');rr(x-12,y-82,24,22,4,lit?'#ffcf6a':'#3a3226');if(lit){const g=ctx.createRadialGradient(x,y-71,3,x,y-71,90);g.addColorStop(0,'rgba(255,200,110,.55)');g.addColorStop(1,'rgba(255,170,80,0)');ctx.fillStyle=g;ctx.fillRect(x-90,y-161,180,180);}ctx.strokeStyle='#1a120a';ctx.lineWidth=2;ctx.strokeRect(x-12,y-82,24,22);}
 function sign(x,y,t){ctx.font='bold 12px '+FB;const w=ctx.measureText(t).width+16;rr(x-2,y-40,4,40,1,'#3a2414');rr(x-w/2,y-62,w,24,4,'#5a3a20');ctx.strokeStyle='#2a1a0c';ctx.lineWidth=1.5;ctx.strokeRect(x-w/2+.5,y-61.5,w-1,23);ctx.fillStyle='#f2e2b8';ctx.textAlign='center';ctx.fillText(t,x,y-45);}
@@ -1946,7 +1949,7 @@ MINI.voda={init(tier){const sp=1+tier*.15;
       rocks:[{k:'g_rock2',x:150,y:470},{k:'g_bush',x:740,y:470},{k:'g_bush2',x:1450,y:470},{k:'g_rock',x:1700,y:470},{k:'g_bush',x:2460,y:470},{k:'g_rock2',x:3420,y:322},{k:'g_bush2',x:3820,y:470},{k:'g_logs',x:4120,y:470},{k:'g_rock',x:5250,y:326}],
       pl:[0,1].map(i=>({x:110+i*50,y:470,vx:0,vy:0,on:null,co:0,jb:0,face:1,fin:false,inv:0,run:false,clb:false}))};
     return M;},
-  key(M,i,a){const p=M.pl[i];if(p.fin)return;if(a==='up'){p.jb=.13;}},
+  key(M,i,a){const p=M.pl[i];if(p.fin)return;if(a==='up'){p.jb=.13+netLag(i)+netSlack(i);}},
   update(M,dt){if(M.res)return;M.time-=dt;if(M.time<=0){M.time=0;miniEnd(false,M.got*10+M.drops*120);return;}
     const T=S.blink;
     for(const q of M.plats){q.dx=0;q.dyy=0;
@@ -1969,11 +1972,11 @@ MINI.voda={init(tier){const sp=1+tier*.15;
       for(const q of M.plats)if(q.k==='g'&&p.y>q.y+.5&&p.y-44<q.y+q.h){if(nx+12>q.x&&nx-12<q.x+q.w){nx=p.x<q.x+q.w/2?q.x-12:q.x+q.w+12;p.vx=0;}}
       p.x=nx;
       if(p.on){const q=p.on;const still=q===o?(Math.abs(p.x-o.x)<20&&!o.clb&&!o.fin):(p.x>q.x-12&&p.x<q.x+q.w+12);if(!still)p.on=null;}
-      if(p.on){p.co=.1;p.vy=0;}
+      if(p.on){p.co=.1+netLag(i)+netSlack(i);p.vy=0;}
       if(p.jb>0&&(p.on||p.co>0)){const boost=p.on===o;p.vy=boost?-770:-650;p.on=null;p.co=0;p.jb=0;beep(boost?640:520+i*80,.06,'square',.03);if(boost){o.squash=.2;}}
       if(!p.on){p.vy=Math.min(900,p.vy+1900*dt);if(!k.u&&p.vy<-260)p.vy=-260;const oy=p.y;p.y+=p.vy*dt;
         if(p.vy>=0){const tops=M.plats.filter(q=>!(q.k==='h'&&q.down>0)).map(q=>({q,y:q.y,x:q.x,w:q.w}));if(!o.fin&&!o.clb)tops.push({q:o,y:o.y-46,x:o.x-17,w:34});
-          for(const t of tops){if(p.x>t.x-11&&p.x<t.x+t.w+11&&oy<=t.y+2&&p.y>=t.y){p.y=t.y;p.vy=0;p.on=t.q;p.co=.1;break;}}}}
+          for(const t of tops){if(p.x>t.x-11&&p.x<t.x+t.w+11&&oy<=t.y+2&&p.y>=t.y){p.y=t.y;p.vy=0;p.on=t.q;p.co=.1+netLag(i)+netSlack(i);break;}}}}
       for(const r of M.ropes)if(!r.open&&p.on&&p.on.k==='g'&&p.on.y===r.top&&p.x>r.x-10&&p.x<r.x+220){r.open=true;sfx.serve();M.msg={t:P[i].name+' сбросил'+(i?'а':'')+' верёвку — лезьте вверх!',life:2.2};}
       if(p.y>H-50)vodaHit(M,i,'Трясина затянула!');
       if(p.inv<=0){for(const w of M.wisps){const wx=w.cx+Math.sin(T*w.sp+w.ph)*w.ax,wy=w.cy+Math.cos(T*w.sp*1.3+w.ph)*w.ay;if(Math.hypot(wx-p.x,wy-(p.y-24))<24){vodaHit(M,i,'Огонёк заманил!');break;}}
@@ -2101,7 +2104,7 @@ MINI.podpol={init(tier){const M={tier,floor:0,floors:3,gold:0,pots:1,rel:[],en:[
     for(const e of M.en){e.dx+=(e.x-e.dx)*Math.min(1,dt*14);e.dy+=(e.y-e.dy)*Math.min(1,dt*14);e.fl=Math.max(0,e.fl-dt);}
     const pa=M.map.flatMap((r,y)=>r.map((c,x)=>c==='P'?[x,y]:null).filter(Boolean));
     if(!M.gOpen&&pa.length===2&&pa.every(([x,y])=>M.pl.some(p=>!p.down&&p.x===x&&p.y===y))){M.gOpen=true;sfx.serve();M.shake=.2;M.msg={t:'Плиты нажаты вдвоём — кладовая открылась!',life:2.2};dgVis(M);}
-    const per=(.82-M.tier*.06)*(M.rel.includes('chasy')?1.33:1);M.per=per;M.tk+=dt;if(M.tk>=per){M.tk-=per;dgTick(M);}},
+    const per=(.82-M.tier*.06)*(M.rel.includes('chasy')?1.33:1)+Math.min(.25,netLag(0)+netLag(1)+netSlack(0)+netSlack(1));M.per=per;M.tk+=dt;if(M.tk>=per){M.tk-=per;dgTick(M);}},
   draw(M){ctx.fillStyle='#070409';ctx.fillRect(0,0,W,H);ctx.save();miniShake(M);
     const live=M.pl.filter(p=>!p.down),fc=live.length?live:M.pl,mx=fc.reduce((a,p)=>a+p.dx,0)/fc.length,my=fc.reduce((a,p)=>a+p.dy,0)/fc.length;
     const tcx=Math.max(0,Math.min(DGW*DGT-W,mx*DGT+DGT/2-W/2)),tcy=Math.max(0,Math.min(DGH*DGT-(H-DGY),my*DGT+DGT/2-(H-DGY)/2));
@@ -2218,10 +2221,10 @@ MINI.svadba={init(tier){if(AC&&AC.state==='suspended')try{AC.resume();}catch(e){
       t+=128*e8+2.6;});
     M.notes.sort((a,b)=>a.t-b.t);M.acc.sort((a,b)=>a.t-b.t);M.end=t-1.8;return M;},
   key(M,i,a){if(a!=='left'&&a!=='right')return;const c=i*2+(a==='left'?0:1);M.lanes[c]=.15;const now=svClock(M)-netLag(i);
-    let best=null;for(const n of M.notes){if(n.t>now+.2)break;if(!n.done&&n.c===c&&Math.abs(n.t-now)<.16&&(!best||Math.abs(n.t-now)<Math.abs(best.t-now)))best=n;}
+    let best=null;for(const n of M.notes){if(n.t>now+.2)break;if(!n.done&&n.c===c&&Math.abs(n.t-now)<.16+netSlack(i)&&(!best||Math.abs(n.t-now)<Math.abs(best.t-now)))best=n;}
     const T=AC?AC.currentTime:0;
     if(c===0){kick(T,.42);snap(T,.05);}else if(c===1){snap(T,.16);osc('sine',2600,T,.12,.03);osc('sine',3400,T+.03,.1,.02);}
-    if(best){const d=Math.abs(best.t-now),gr=d<.05?2:d<.1?1:0;best.done=true;best.hitBy=i;M.hits++;M.cb[i]++;M.streak[i]++;M.best=Math.max(M.best,M.cb[i]);
+    if(best){const d=Math.abs(best.t-now)-netSlack(i)*.6,gr=d<.05?2:d<.1?1:0;best.done=true;best.hitBy=i;M.hits++;M.cb[i]++;M.streak[i]++;M.best=Math.max(M.best,M.cb[i]);
       const mul=(M.fever>0?2:1)*(1+Math.min(4,Math.floor(M.cb[i]/10))*.25);M.score+=Math.round([30,60,100][gr]*mul);M.fun=Math.min(100,M.fun+[.6,1.2,2][gr]);
       M.fx.push({c,t:.45,txt:['Ладно','Хорошо','Чудно!'][gr],col:['#cfc0a0','#ffe08a','#9fffb0'][gr]});
       if(c>=2)lead('harp',hz(best.p+12),T,best.hold?best.hold+.2:.35);
@@ -2232,7 +2235,7 @@ MINI.svadba={init(tier){if(AC&&AC.state==='suspended')try{AC.resume();}catch(e){
   update(M,dt){if(M.res)return;M.gt+=dt;const now=svClock(M);for(let k=0;k<4;k++)M.lanes[k]=Math.max(0,M.lanes[k]-dt);M.fx=M.fx.filter(f=>(f.t-=dt)>0);M.fever=Math.max(0,M.fever-dt);M.chorus=Math.max(0,M.chorus-dt);
     if(AC){while(M.ai<M.acc.length&&M.acc[M.ai].t<now+.35){const ev=M.acc[M.ai++],T=M.a0+ev.t;if(T<AC.currentTime)continue;
       if(ev.f==='bass')bass(hz(ev.r-12),T,'bala');if(ev.f==='strum')strum(ev.r,ev.q,T,ev.inst);if(ev.f==='tick')snap(T,.02);}}
-    for(const n of M.notes){if(n.t>now)break;if(n.done)continue;const i=n.c<2?0:1;if(now-netLag(i)-n.t>.16){n.done=true;n.missed=true;M.miss++;M.cb[i]=0;M.streak[i]=0;M.fun-=n.gold?5:3.5;}}
+    for(const n of M.notes){if(n.t>now)break;if(n.done)continue;const i=n.c<2?0:1;if(now-netLag(i)-n.t>.16+netSlack(i)){n.done=true;n.missed=true;M.miss++;M.cb[i]=0;M.streak[i]=0;M.fun-=n.gold?5:3.5;}}
     for(const n of M.notes){if(!n.holding)continue;const i=n.c<2?0:1,code=P[i].ctrl[n.hk];if(now-netLag(i)>=n.t+n.hold){n.holding=false;M.score+=Math.round(60*(M.fever>0?2:1));M.fun=Math.min(100,M.fun+1);M.fx.push({c:n.c,t:.5,txt:'Протяжно!',col:'#c8f0ff'});}
       else if(!keys[code]){n.holding=false;n.cut=now;}}
     for(const p of M.conf){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=60*dt;p.r+=dt*4;}M.conf=M.conf.filter(p=>p.y<H+20);

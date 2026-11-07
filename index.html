@@ -1891,7 +1891,7 @@ $('peerVol').addEventListener('input',()=>{if(NET.peerAudio)NET.peerAudio.volume
 $('micOn').addEventListener('change',()=>{$('barMic').checked=$('micOn').checked;});$('barMic').addEventListener('change',()=>{$('micOn').checked=$('barMic').checked;});
 const turnStore=()=>{try{localStorage.setItem('kuhnya-turn',JSON.stringify({url:$('turnUrl').value.trim(),user:$('turnUser').value.trim(),pass:$('turnPass').value.trim()}));}catch(e){}};
 $('turnSave').addEventListener('click',()=>{turnStore();netStat('TURN-сервер сохранён. Он сработает при следующем соединении.','ok');});
-$('turnPreset').addEventListener('click',()=>{$('turnUrl').value='turn:relay1.expressturn.com:3478, turns:relay1.expressturn.com:443?transport=tcp';$('turnUser').focus();netStat('Адрес вписан. Теперь логин и пароль из кабинета ExpressTURN, затем «Сохранить» и «Проверить».');});
+$('turnPreset').addEventListener('click',()=>{$('turnUrl').value='turn:free.expressturn.com:3478, turn:free.expressturn.com:3478?transport=tcp';$('turnUser').focus();netStat('Адрес вписан. Теперь логин и пароль из кабинета ExpressTURN, затем «Сохранить» и «Проверить».');});
 $('turnTest').addEventListener('click',()=>{turnStore();turnProbe();});
 for(const el of document.querySelectorAll('input[name=sch]')){el.checked=el.value===NET.scheme;el.addEventListener('change',()=>{if(!el.checked)return;NET.scheme=el.value;try{localStorage.setItem('kuhnya-ctrl',el.value);}catch(e){}netSend(Object.assign({t:'scheme'},myScheme()));netStat('Управление: '+SCHNAME[el.value]+'.','ok');});}
 // --- own key bindings (network play only) ---

@@ -188,8 +188,9 @@ body.touch.tpage .tback{display:block}
       <div class="netrow"><span>Мой голос</span><div class="meter" id="micMeter"><i></i></div></div>
       <div class="netrow"><label for="micSens">Чувствительность</label><input type="range" id="micSens" min="0" max="100" value="60"><span id="micSensV">60</span><label for="peerVol">Громкость напарника</label><input type="range" id="peerVol" min="0" max="100" value="90"></div>
       <p>Микрофон спросит разрешение при создании комнаты или входе. Говорите — полоска станет зелёной и голос уйдёт напарнику. Если ловит шум — уменьшите чувствительность. Лучше играть в наушниках.</p></div>
-    <details class="turn"><summary>Не соединяется? Свой TURN-сервер</summary>
-      <div class="netcard" style="margin-top:8px"><p>Если у кого-то из вас мобильный интернет или строгий роутер, прямое соединение может не пробиться. Тогда нужен ретранслятор (TURN). Бесплатный можно взять, например, на metered.ca: зарегистрируйтесь и вставьте сюда адрес, логин и пароль. Обоим игрокам — одинаковые.</p>
+    <details class="turn" id="turnBox"><summary>Не соединяется? Свой TURN-сервер</summary>
+      <div class="netcard" style="margin-top:8px"><p>Из разных городов прямое соединение часто не пробивается через роутеры и провайдеров — тогда нужен сервер-посредник (TURN). Бесплатный: зарегистрируйтесь на expressturn.com (1 ТБ в месяц бесплатно), нажмите «ExpressTURN» ниже и впишите логин и пароль из личного кабинета. Хватит, чтобы это сделал один из вас: хозяин передаст сервер гостю сам.</p>
+      <div class="netrow"><button type="button" class="btn ghost" id="turnPreset">ExpressTURN</button><button type="button" class="btn ghost" id="turnTest">Проверить</button></div>
       <div class="netrow"><input type="text" id="turnUrl" placeholder="turn:адрес:443?transport=tcp" aria-label="Адрес TURN"></div>
       <div class="netrow"><input type="text" id="turnUser" placeholder="логин" aria-label="Логин TURN"><input type="text" id="turnPass" placeholder="пароль" aria-label="Пароль TURN"><button type="button" class="btn ghost" id="turnSave">Сохранить</button></div></div></details>
   </div></div></div>
@@ -1683,8 +1684,25 @@ class Sig{
   got(m){if(!m||!m.mid||this.seen.has(m.mid))return;this.seen.add(m.mid);this.onMsg(m);}
   close(){this.closed=true;clearInterval(this.ping);for(const k of this.socks){clearTimeout(k.retryT);try{k.ws&&k.ws.close();}catch(e){}}this.socks=[];}
 }
+// TURN relay: needed when the players' routers / operators block direct links (different cities).
+// The host's relay is passed to the guest, so it is enough for one of the two to set it up.
+function ownTurn(){try{const t=JSON.parse(localStorage.getItem('kuhnya-turn')||'null');if(t&&t.url)return [{urls:t.url.split(/[\s,]+/).filter(Boolean),username:t.user||'',credential:t.pass||''}];}catch(e){}return [];}
 function iceServers(){const L=[{urls:['stun:stun.l.google.com:19302','stun:stun1.l.google.com:19302']},{urls:'stun:stun.nextcloud.com:443'}];
-  try{const t=JSON.parse(localStorage.getItem('kuhnya-turn')||'null');if(t&&t.url)L.push({urls:t.url,username:t.user||'',credential:t.pass||''});}catch(e){}return L;}
+  for(const t of ownTurn())L.push(t);for(const t of (NET.hostIce||[]))if(t&&t.urls)L.push(t);return L;}
+// how the two computers ended up connected: directly or through the relay
+async function netRoute(){const pc=NET.pc;if(!pc)return;try{const st=await pc.getStats();let pair=null;st.forEach(r=>{if(r.type==='transport'&&r.selectedCandidatePairId)pair=st.get(r.selectedCandidatePairId);});
+  if(!pair)st.forEach(r=>{if(r.type==='candidate-pair'&&r.nominated&&r.state==='succeeded')pair=r;});if(!pair)return;
+  const lc=st.get(pair.localCandidateId),rc=st.get(pair.remoteCandidateId),relay=(lc&&lc.candidateType==='relay')||(rc&&rc.candidateType==='relay');NET.via=relay?'relay':'direct';
+  $('netBarStat').textContent=relay?'через сервер-посредник':'напрямую';
+  if(NET.role==='host')for(const s_ of pc.getSenders())if(s_.track&&s_.track.kind==='video'){const p=s_.getParameters();if(!p.encodings||!p.encodings.length)continue;p.encodings[0].maxBitrate=relay?3000000:9000000;s_.setParameters(p).catch(()=>{});}}catch(e){}}
+function netCandNote(pc,c){if(!c)return;(pc._ct=pc._ct||{})[c.type||(/ typ (\w+)/.exec(c.candidate||'')||[])[1]||'?']=1;}
+function netFailText(pc){const t=pc&&pc._ct||{};if(!t.relay&&!(NET.hostIce||[]).length)return 'Напрямую соединиться не вышло — роутеры или провайдеры не пускают. Нужен сервер-посредник (TURN): «Настройки сети» → «Не соединяется? Свой TURN-сервер». Хватит, чтобы его вписал один из вас.';
+  return 'Не удалось соединиться даже через сервер-посредник. Нажмите «Проверить» в настройках TURN — проверим логин и доступность.';}
+// probe the relay: can this computer get an address on it with these login and password?
+async function turnProbe(){const t=ownTurn()[0];if(!t)return netStat('Сначала впишите адрес, логин и пароль TURN.','err');netStat('Проверяем сервер-посредник…');
+  const pc=new RTCPeerConnection({iceServers:[t],iceTransportPolicy:'relay'});const errs=[];let ok=false;pc.onicecandidate=e=>{if(e.candidate&&/ typ relay/.test(e.candidate.candidate))ok=true;};pc.onicecandidateerror=e=>errs.push(e.errorCode);
+  pc.createDataChannel('x');await pc.setLocalDescription(await pc.createOffer());for(let k=0;k<16&&!ok;k++)await new Promise(r=>setTimeout(r,500));pc.close();
+  if(ok)netStat('Сервер-посредник работает ✓ Можно создавать комнату.','ok');else if(errs.includes(401))netStat('Сервер отвечает, но логин или пароль не подходят.','err');else netStat('Сервер не отвечает. Проверьте адрес или попробуйте другой.','err');}
 // --- microphone + voice activation ---
 let VAC=null;
 function netVAC(){if(!VAC)try{VAC=new (window.AudioContext||window.webkitAudioContext)();}catch(e){}if(VAC&&VAC.state==='suspended')VAC.resume().catch(()=>{});return VAC;}
@@ -1750,8 +1768,8 @@ function netOnData(m){
 // --- connection ---
 function netPC(){const pc=new RTCPeerConnection({iceServers:iceServers()});
   pc.onconnectionstatechange=()=>{if(pc!==NET.pc)return;const st=pc.connectionState;
-    if(st==='connected'){NET.connected=true;clearTimeout(NET.failT);netStat(NET.role==='host'?'Напарник подключился!':'Подключено — играем! Ваш герой выбирается в лобби у хозяина.','ok');netConnected();}
-    else if(st==='failed'){netLost('Не удалось соединиться напрямую. Попробуйте ещё раз или укажите TURN-сервер (ниже).');}
+    if(st==='connected'){NET.connected=true;clearTimeout(NET.failT);setTimeout(netRoute,800);setTimeout(netRoute,5000);netStat(NET.role==='host'?'Напарник подключился!':'Подключено — играем! Ваш герой выбирается в лобби у хозяина.','ok');netConnected();}
+    else if(st==='failed'){netLost(netFailText(pc));try{$('turnBox').open=true;}catch(e){}}
     else if(st==='disconnected'){clearTimeout(NET.discT);NET.discT=setTimeout(()=>{if(pc===NET.pc&&pc.connectionState==='disconnected')netLost('Связь с напарником пропала.');},6000);}};
   return pc;}
 function netConnected(){NET.relinking=false;$('netRe').hidden=true;clearInterval(NET.helloT);NET.lastRx=performance.now();clearInterval(NET.wdT);NET.wdT=setInterval(()=>{if(NET.connected&&performance.now()-NET.lastRx>7000)netLost('Связь с напарником пропала.');},1000);
@@ -1795,10 +1813,10 @@ async function netHostMsg(m){
     if(NET.mic)pc.addTrack(NET.micTrack,NET.mic);else pc.addTransceiver('audio',{direction:'recvonly'});
     const dc=NET.dc=pc.createDataChannel('g');dc.onmessage=ev=>{try{netOnData(JSON.parse(ev.data));}catch(e){}};
     pc.ontrack=ev=>{if(ev.track.kind==='audio')netPeerVoice(ev.streams[0]||new MediaStream([ev.track]));};
-    pc.onicecandidate=ev=>{if(ev.candidate)NET.sig.pub(to,{t:'ice',to:m.gid,c:ev.candidate.toJSON()});};
+    pc.onicecandidate=ev=>{netCandNote(pc,ev.candidate);if(ev.candidate)NET.sig.pub(to,{t:'ice',to:m.gid,c:ev.candidate.toJSON()});};
     NET.pend=[];const off=await pc.createOffer();await pc.setLocalDescription(off);
-    NET.sig.pub(to,{t:'offer',to:m.gid,sdp:pc.localDescription.sdp,gs:NET.game.id});netStat('Напарник стучится… соединяемся.');
-    clearTimeout(NET.failT);NET.failT=setTimeout(()=>{if(!NET.connected)netStat('Соединение не устанавливается. Если так и не выйдет — нужен TURN-сервер (ниже).','err');},20000);}
+    NET.sig.pub(to,{t:'offer',to:m.gid,sdp:pc.localDescription.sdp,gs:NET.game.id,ice:ownTurn()});netStat('Напарник стучится… соединяемся.');
+    clearTimeout(NET.failT);NET.failT=setTimeout(()=>{if(!NET.connected)netStat('Соединение пока не устанавливается — пробуем через сервер-посредник…','err');},15000);}
   else if(m.gid===NET.gid&&NET.pc){
     if(m.t==='answer'){await NET.pc.setRemoteDescription({type:'answer',sdp:sdpFast(m.sdp)});for(const c of NET.pend)NET.pc.addIceCandidate(c).catch(()=>{});NET.pend=[];}
     else if(m.t==='ice'){if(NET.pc.remoteDescription)NET.pc.addIceCandidate(m.c).catch(()=>{});else NET.pend.push(m.c);}}}
@@ -1813,15 +1831,15 @@ async function netJoin(){netVAC();const code=$('netJoinCode').value.replace(/\D/
 async function netGuestMsg(m,host){
   if(m.to&&m.to!==NET.gid)return;
   if(m.t==='full'){if(NET.relinking)return;NET.fullN=(NET.fullN||0)+1;netStat('В комнате сейчас занято место гостя. Если это вы до перезагрузки — подождите несколько секунд…','err');if(NET.fullN>12){clearInterval(NET.helloT);netStat('В этой комнате уже играют двое.','err');}return;}
-  if(m.t==='offer'){if(NET.pc)return;clearInterval(NET.helloT);const pc=NET.pc=netPC();NET.pend=NET.pend||[];
+  if(m.t==='offer'){if(NET.pc)return;clearInterval(NET.helloT);NET.hostIce=Array.isArray(m.ice)?m.ice.slice(0,3):[];const pc=NET.pc=netPC();NET.pend=NET.pend||[];
     pc.ontrack=ev=>{const st=ev.streams[0];if(st&&st.id===m.gs){const v=$('netVideo');if(v.srcObject!==st){v.srcObject=st;v.play().catch(()=>{});}}else if(ev.track.kind==='audio')netPeerVoice(st||new MediaStream([ev.track]));};
     pc.ondatachannel=ev=>{NET.dc=ev.channel;NET.dc.onmessage=e2=>{try{netOnData(JSON.parse(e2.data));}catch(e){}};};
-    pc.onicecandidate=ev=>{if(ev.candidate)NET.sig.pub(host,{t:'ice',gid:NET.gid,c:ev.candidate.toJSON()});};
+    pc.onicecandidate=ev=>{netCandNote(pc,ev.candidate);if(ev.candidate)NET.sig.pub(host,{t:'ice',gid:NET.gid,c:ev.candidate.toJSON()});};
     await pc.setRemoteDescription({type:'offer',sdp:sdpFast(m.sdp)});
     if(NET.mic){const tr=pc.getTransceivers().filter(t=>t.receiver.track.kind==='audio')[1];if(tr){tr.direction='sendrecv';await tr.sender.replaceTrack(NET.micTrack);}}
     for(const c of NET.pend)pc.addIceCandidate(c).catch(()=>{});NET.pend=[];
     const ans=await pc.createAnswer();await pc.setLocalDescription(ans);NET.sig.pub(host,{t:'answer',gid:NET.gid,sdp:pc.localDescription.sdp});netStat('Комната найдена, соединяемся…');
-    clearTimeout(NET.failT);NET.failT=setTimeout(()=>{if(!NET.connected)netStat('Соединение не устанавливается. Если так и не выйдет — нужен TURN-сервер (ниже), одинаковый у обоих.','err');},20000);}
+    clearTimeout(NET.failT);NET.failT=setTimeout(()=>{if(!NET.connected)netStat('Соединение пока не устанавливается — пробуем через сервер-посредник…','err');},15000);}
   else if(m.t==='ice'&&NET.pc){if(NET.pc.remoteDescription)NET.pc.addIceCandidate(m.c).catch(()=>{});else NET.pend.push(m.c);}
   else if(m.t==='ice')(NET.pend=NET.pend||[]).push(m.c);}
 function netShowPanel(v){$('netPanel').hidden=!v;$('netSlot').textContent=SLOT;if(v){const t=localStorage.getItem('kuhnya-turn');try{const o=JSON.parse(t||'null');if(o){$('turnUrl').value=o.url||'';$('turnUser').value=o.user||'';$('turnPass').value=o.pass||'';}}catch(e){}}else cv.focus();}
@@ -1871,7 +1889,10 @@ $('netCopy').addEventListener('click',()=>{const u=location.href.split('#')[0]+'
 $('micSens').addEventListener('input',()=>{$('micSensV').textContent=$('micSens').value;try{localStorage.setItem('kuhnya-mic',$('micSens').value);}catch(e){}});
 $('peerVol').addEventListener('input',()=>{if(NET.peerAudio)NET.peerAudio.volume=$('peerVol').value/100;});
 $('micOn').addEventListener('change',()=>{$('barMic').checked=$('micOn').checked;});$('barMic').addEventListener('change',()=>{$('micOn').checked=$('barMic').checked;});
-$('turnSave').addEventListener('click',()=>{try{localStorage.setItem('kuhnya-turn',JSON.stringify({url:$('turnUrl').value.trim(),user:$('turnUser').value.trim(),pass:$('turnPass').value.trim()}));}catch(e){}netStat('TURN-сервер сохранён. Он сработает при следующем соединении.','ok');});
+const turnStore=()=>{try{localStorage.setItem('kuhnya-turn',JSON.stringify({url:$('turnUrl').value.trim(),user:$('turnUser').value.trim(),pass:$('turnPass').value.trim()}));}catch(e){}};
+$('turnSave').addEventListener('click',()=>{turnStore();netStat('TURN-сервер сохранён. Он сработает при следующем соединении.','ok');});
+$('turnPreset').addEventListener('click',()=>{$('turnUrl').value='turn:relay1.expressturn.com:3478, turns:relay1.expressturn.com:443?transport=tcp';$('turnUser').focus();netStat('Адрес вписан. Теперь логин и пароль из кабинета ExpressTURN, затем «Сохранить» и «Проверить».');});
+$('turnTest').addEventListener('click',()=>{turnStore();turnProbe();});
 for(const el of document.querySelectorAll('input[name=sch]')){el.checked=el.value===NET.scheme;el.addEventListener('change',()=>{if(!el.checked)return;NET.scheme=el.value;try{localStorage.setItem('kuhnya-ctrl',el.value);}catch(e){}netSend(Object.assign({t:'scheme'},myScheme()));netStat('Управление: '+SCHNAME[el.value]+'.','ok');});}
 // --- own key bindings (network play only) ---
 const ACTNAME={up:'Вверх',down:'Вниз',left:'Влево',right:'Вправо',use:'Взять / положить',work:'Работать (держать)',dash:'Рывок',skill:'Умение'};

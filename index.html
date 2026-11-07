@@ -1694,7 +1694,7 @@ async function netRoute(){const pc=NET.pc;if(!pc)return;try{const st=await pc.ge
   if(!pair)st.forEach(r=>{if(r.type==='candidate-pair'&&r.nominated&&r.state==='succeeded')pair=r;});if(!pair)return;
   const lc=st.get(pair.localCandidateId),rc=st.get(pair.remoteCandidateId),relay=(lc&&lc.candidateType==='relay')||(rc&&rc.candidateType==='relay');NET.via=relay?'relay':'direct';
   $('netBarStat').textContent=relay?'через сервер-посредник':'напрямую';
-  if(NET.role==='host')for(const s_ of pc.getSenders())if(s_.track&&s_.track.kind==='video'){const p=s_.getParameters();if(!p.encodings||!p.encodings.length)continue;p.encodings[0].maxBitrate=relay?3000000:9000000;s_.setParameters(p).catch(()=>{});}}catch(e){}}
+  if(NET.role==='host')for(const s_ of pc.getSenders())if(s_.track&&s_.track.kind==='video'){const p=s_.getParameters();if(!p.encodings||!p.encodings.length)continue;p.encodings[0].maxBitrate=relay?3000000:9000000;if(relay)p.degradationPreference='balanced';s_.setParameters(p).catch(()=>{});}}catch(e){}}
 function netCandNote(pc,c){if(!c)return;(pc._ct=pc._ct||{})[c.type||(/ typ (\w+)/.exec(c.candidate||'')||[])[1]||'?']=1;}
 function netFailText(pc){const t=pc&&pc._ct||{};if(!t.relay&&!(NET.hostIce||[]).length)return 'Напрямую соединиться не вышло — роутеры или провайдеры не пускают. Нужен сервер-посредник (TURN): «Настройки сети» → «Не соединяется? Свой TURN-сервер». Хватит, чтобы его вписал один из вас.';
   return 'Не удалось соединиться даже через сервер-посредник. Нажмите «Проверить» в настройках TURN — проверим логин и доступность.';}
@@ -1832,7 +1832,7 @@ async function netGuestMsg(m,host){
   if(m.to&&m.to!==NET.gid)return;
   if(m.t==='full'){if(NET.relinking)return;NET.fullN=(NET.fullN||0)+1;netStat('В комнате сейчас занято место гостя. Если это вы до перезагрузки — подождите несколько секунд…','err');if(NET.fullN>12){clearInterval(NET.helloT);netStat('В этой комнате уже играют двое.','err');}return;}
   if(m.t==='offer'){if(NET.pc)return;clearInterval(NET.helloT);NET.hostIce=Array.isArray(m.ice)?m.ice.slice(0,3):[];const pc=NET.pc=netPC();NET.pend=NET.pend||[];
-    pc.ontrack=ev=>{const st=ev.streams[0];if(st&&st.id===m.gs){const v=$('netVideo');if(v.srcObject!==st){v.srcObject=st;v.play().catch(()=>{});}}else if(ev.track.kind==='audio')netPeerVoice(st||new MediaStream([ev.track]));};
+    pc.ontrack=ev=>{try{ev.receiver.jitterBufferTarget=0;}catch(e){}try{ev.receiver.playoutDelayHint=0;}catch(e){}const st=ev.streams[0];if(st&&st.id===m.gs){const v=$('netVideo');if(v.srcObject!==st){v.srcObject=st;v.play().catch(()=>{});}}else if(ev.track.kind==='audio')netPeerVoice(st||new MediaStream([ev.track]));};
     pc.ondatachannel=ev=>{NET.dc=ev.channel;NET.dc.onmessage=e2=>{try{netOnData(JSON.parse(e2.data));}catch(e){}};};
     pc.onicecandidate=ev=>{netCandNote(pc,ev.candidate);if(ev.candidate)NET.sig.pub(host,{t:'ice',gid:NET.gid,c:ev.candidate.toJSON()});};
     await pc.setRemoteDescription({type:'offer',sdp:sdpFast(m.sdp)});
